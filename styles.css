@@ -1,0 +1,165 @@
+/* ============================================================
+   The Take Matters — Landing Page Styles
+   Clean, single-column, content-forward.
+   Replace fonts/colors/spacing as the brand develops.
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --text: #1a1a1a;
+  --text-secondary: #555;
+  --text-tertiary: #888;
+  --accent: #b8623a;       /* warm rust — replace when brand is set */
+  --bg: #fafaf7;
+  --rule: #e5e5e2;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+a:hover {
+  border-bottom-color: var(--accent);
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 64px 24px 48px;
+}
+
+/* ── HERO ── */
+.hero {
+  text-align: center;
+  padding-bottom: 48px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 48px;
+}
+
+.hero-photo {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 32px;
+  display: block;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.hero-name {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+
+.hero-tagline {
+  font-size: 17px;
+  color: var(--text-secondary);
+  max-width: 540px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+
+/* ── BIO ── */
+.bio {
+  margin-bottom: 56px;
+}
+
+.bio p {
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: var(--text);
+  margin-bottom: 22px;
+}
+
+.bio p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── CONTACT ── */
+.contact {
+  padding: 36px 32px;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.contact h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.3px;
+}
+
+.contact p {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.contact p:last-child {
+  margin-bottom: 0;
+}
+
+.contact-email a {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ── MOBILE ── */
+@media (max-width: 600px) {
+  .page {
+    padding: 40px 20px 32px;
+  }
+
+  .hero-photo {
+    width: 160px;
+    height: 160px;
+  }
+
+  .hero-name {
+    font-size: 32px;
+  }
+
+  .hero-tagline {
+    font-size: 15px;
+  }
+
+  .bio p {
+    font-size: 16px;
+  }
+
+  .contact {
+    padding: 28px 20px;
+  }
+}
