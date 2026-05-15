@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research | Jeffrey Anthony</title>
+<meta name="description" content="Empirical and interpretive research on the structural transformation of recorded popular music since 1960. Conducted by Jeffrey Anthony, published by the Musical Form Institute.">
+<meta property="og:title" content="Research | Jeffrey Anthony">
+<meta property="og:description" content="Empirical and interpretive research on how recorded popular music has changed across six decades.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thetakematters.com/research/">
+<meta property="og:site_name" content="The Take Matters">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Research | Jeffrey Anthony">
+<meta name="twitter:description" content="Empirical and interpretive research on how recorded popular music has changed across six decades.">
+<link rel="canonical" href="https://musicalform.org/research">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<main class="page-wide">
+
+  <nav class="topnav">
+    <a href="/">The Take Matters</a>
+    <a href="/writing/">Writing</a>
+    <a href="/research/" aria-current="page">Research</a>
+  </nav>
+
+  <section class="research-hero">
+    <div class="research-hero-grid">
+      <div>
+        <div class="research-eyebrow">Research</div>
+        <h1>Empirical and interpretive work on the structure of recorded music</h1>
+        <p class="lede">Original research on how the production of popular music has changed across six decades. The work pairs measured datasets with interpretive essays. The empirical work stands on its own; the interpretive work asks what the measured shifts mean for listeners, music makers, and civic life.</p>
+      </div>
+      <a href="/research/gridification/" class="featured-card" aria-label="View the Gridification dataset and charts">
+        <span class="featured-tag">Featured dataset</span>
+        <div class="chart-preview">
+          <div class="chart-preview-loading" id="chartLoading">Loading chart&hellip;</div>
+          <canvas id="researchHeroChart" aria-label="Tempo variance trend 1960 to 2025"></canvas>
+        </div>
+        <div class="chart-x-labels"><span>1960</span><span>1985</span><span>2025</span></div>
+        <h3>The Gridification of Popular Music, 1960 through 2025</h3>
+        <div class="featured-meta">66 years &middot; 330 tracks &middot; Billboard Year-End Hot 100 Top 5</div>
+        <div class="featured-finding">Mean within-song tempo standard deviation fell from approximately <strong>1.5 BPM</strong> in the late analog era to under <strong>0.5 BPM</strong> after Pro Tools' Beat Detective shipped in 2001.</div>
+        <span class="featured-cta">View dataset and charts &rarr;</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="research-section">
+    <div class="research-grid">
+
+      <a href="/research/perfect-music-democracy.pdf" target="_blank" rel="noopener" class="research-card">
+        <span class="research-tag">Companion essay</span>
+        <h3>Does &lsquo;Perfect&rsquo; Music Make Us Worse at Democracy?</h3>
+        <div class="meta">Essay &middot; PDF</div>
+        <p>Contrasting Taylor Swift's <em>Opalite</em> (standard deviation 0.02 BPM) with Fleetwood Mac's <em>Dreams</em> (standard deviation 1.82 BPM), the essay uses Susanne Langer's account of presentational symbolism to argue that the difference between the two recordings is categorical rather than stylistic. The civic stakes follow from that distinction.</p>
+        <span class="cta">Read the essay (PDF) &darr;</span>
+      </a>
+
+      <a href="/research/listening-to-ai-25-years.pdf" target="_blank" rel="noopener" class="research-card">
+        <span class="research-tag">Companion essay</span>
+        <h3>You&rsquo;ve Been Listening to AI Music for 25 Years</h3>
+        <div class="meta">Essay &middot; PDF</div>
+        <p>The relevant inflection point in popular music production was not the arrival of generative AI. It was the institutionalization of Beat Detective in Pro Tools TDM 5.1 in 2001. Once human performance was routinely sliced, quantized, and reassembled to a grid, the structural distinction between human and machine production collapsed. Generative AI followed the logic that grid-based correction had already established.</p>
+        <span class="cta">Read the essay (PDF) &darr;</span>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">About this work</div>
+    <h2 style="font-size:28px;font-weight:700;letter-spacing:-0.6px;margin-bottom:14px;line-height:1.2;">How the research connects to the certification</h2>
+    <p class="research-section-intro">The Musical Form Institute's certification programs verify production process. The research published here documents, at scale, what gridification looks like across six decades of popular recording. The dataset does not certify anything itself. It provides the public empirical context against which the certification's claim becomes legible: that a Certificate of Embodied Production marked recording preserves human timing and decision-making against a measurable baseline of what unmarked recordings now typically are.</p>
+  </section>
+
+  <p class="research-source-note">This research is conducted by Jeffrey Anthony and published by the <a href="https://musicalform.org/research" target="_blank" rel="noopener">Musical Form Institute</a>, which is its canonical home. It is reproduced here as part of the public argument behind The Take Matters.</p>
+
+  <footer class="footer">
+    <p>&copy; 2026 The Take Matters. All rights reserved.</p>
+  </footer>
+
+</main>
+
+<script>
+(function() {
+  function centeredMovingAvg(data, window) {
+    var half = Math.floor(window / 2);
+    return data.map(function(_, i) {
+      var sum = 0, count = 0;
+      for (var j = Math.max(0, i - half); j <= Math.min(data.length - 1, i + half); j++) {
+        if (data[j] != null && !isNaN(data[j])) { sum += data[j]; count++; }
+      }
+      return count ? sum / count : null;
+    });
+  }
+
+  function render() {
+    var canvas = document.getElementById('researchHeroChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    fetch('/research/gridification/data.json')
+      .then(function(r) { return r.json(); })
+      .then(function(payload) {
+        var tracks = payload.tracks || [];
+        var byYear = {};
+        tracks.forEach(function(t) {
+          if (typeof t.year !== 'number' || typeof t.std_dev !== 'number') return;
+          (byYear[t.year] = byYear[t.year] || []).push(t.std_dev);
+        });
+        var years = Object.keys(byYear).map(Number).sort(function(a, b) { return a - b; });
+        var meanByYear = years.map(function(y) {
+          var arr = byYear[y];
+          return arr.reduce(function(s, v) { return s + v; }, 0) / arr.length;
+        });
+        var smoothed = centeredMovingAvg(meanByYear, 5);
+
+        var loading = document.getElementById('chartLoading');
+        if (loading) loading.style.display = 'none';
+
+        new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: years,
+            datasets: [
+              {
+                data: meanByYear,
+                borderColor: 'rgba(184,98,58,0.25)',
+                backgroundColor: 'rgba(184,98,58,0.04)',
+                borderWidth: 1,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+              },
+              {
+                data: smoothed,
+                borderColor: '#b8623a',
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                tension: 0.45,
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 800 },
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+              x: { display: false, grid: { display: false } },
+              y: { display: false, grid: { display: false }, beginAtZero: true },
+            },
+            interaction: { mode: null },
+          },
+        });
+      })
+      .catch(function(err) {
+        console.warn('Hero chart preview failed:', err);
+        var loading = document.getElementById('chartLoading');
+        if (loading) loading.textContent = 'Chart unavailable';
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', render);
+  } else {
+    render();
+  }
+})();
+</script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+
+</body>
+</html>

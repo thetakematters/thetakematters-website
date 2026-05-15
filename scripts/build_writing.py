@@ -187,6 +187,7 @@ PAGE = """<!DOCTYPE html>
   <nav class="topnav">
     <a href="/">The Take Matters</a>
     <a href="/writing/" aria-current="page">Writing</a>
+    <a href="/research/">Research</a>
   </nav>
 
   <section class="writing-header">

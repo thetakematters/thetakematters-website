@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Gridification of Popular Music | Jeffrey Anthony</title>
+<meta name="description" content="The gridification of popular music, documented across 66 years. Within-song tempo variability data for 330 Billboard Hot 100 top-five hits (1960-2025) shows a sharp post-2001 inflection after Pro Tools Beat Detective shipped. Measurement and methodology by the Musical Form Institute.">
+<meta property="og:title" content="The Gridification of Popular Music | Jeffrey Anthony">
+<meta property="og:description" content="The gridification of popular music, 1960 through 2025: tempo variability across 66 years of Billboard Hot 100 top-five hits. The grid arrived in 2001 and the chart shows what happened.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thetakematters.com/research/gridification/">
+<meta property="og:site_name" content="The Take Matters">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Gridification of Popular Music | 1960 through 2025">
+<meta name="twitter:description" content="The gridification of popular music, 1960 through 2025. Tempo variability across 66 years of Billboard Hot 100 top-five hits.">
+<link rel="canonical" href="https://musicalform.org/research/gridification">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": "The Gridification of Popular Music: 1960 through 2025",
+  "description": "Within-song tempo variability measurements for 330 sound recordings: Billboard Year-End Hot 100 Top 5 from 1960 through 2025. Measurements include mean tempo, standard deviation, range, percentage within plus or minus 1 BPM, number of tempo transitions, and coefficient of variation. Methodology consistent with Carter and von Appen (Integral Vol. 38, 2025) extended through 2025.",
+  "url": "https://musicalform.org/research/gridification",
+  "keywords": ["tempo variability", "Beat Detective", "Pro Tools", "Billboard Hot 100", "music production", "gridification", "click track", "sequencing", "Logic Pro", "presentational symbol", "Susanne Langer", "Carter and von Appen"],
+  "creator": {
+    "@type": "Organization",
+    "name": "The Musical Form Institute",
+    "url": "https://musicalform.org",
+    "parentOrganization": { "@type": "Organization", "name": "Muse Foundry LLC" }
+  },
+  "temporalCoverage": "1960/2025",
+  "spatialCoverage": "United States",
+  "license": "https://musicalform.org/terms-of-use",
+  "isAccessibleForFree": true,
+  "citation": "Carter, D. S., and von Appen, R. (2025). Tempo Variability in Billboard Hot 100 Songs, 1966 through 1995. Integral, Vol. 38.",
+  "distribution": [{
+    "@type": "DataDownload",
+    "encodingFormat": "application/json",
+    "contentUrl": "https://musicalform.org/research/gridification/data.json"
+  }],
+  "variableMeasured": [
+    { "@type": "PropertyValue", "name": "mean_tempo", "unitText": "BPM" },
+    { "@type": "PropertyValue", "name": "std_dev", "unitText": "BPM" },
+    { "@type": "PropertyValue", "name": "tempo_min", "unitText": "BPM" },
+    { "@type": "PropertyValue", "name": "tempo_max", "unitText": "BPM" },
+    { "@type": "PropertyValue", "name": "pct_within_1bpm", "unitText": "fraction" },
+    { "@type": "PropertyValue", "name": "transitions", "unitText": "count" },
+    { "@type": "PropertyValue", "name": "cv", "unitText": "ratio" }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ScholarlyArticle",
+  "headline": "The Gridification of Popular Music: 1960 through 2025",
+  "description": "Empirical analysis of tempo variability in Billboard Year-End Hot 100 Top 5 recordings across 66 years. Documents a sharp acceleration in the decline of within-song timing variance after Pro Tools Beat Detective shipped in 2001.",
+  "url": "https://musicalform.org/research/gridification",
+  "author": {
+    "@type": "Person",
+    "name": "Jeffrey Anthony",
+    "url": "https://musicalform.org/about#founder"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "The Musical Form Institute",
+    "url": "https://musicalform.org",
+    "logo": { "@type": "ImageObject", "url": "https://musicalform.org/img/mfi-logo-horizontal.png" }
+  },
+  "datePublished": "2026-05-09",
+  "dateModified": "2026-05-09",
+  "isAccessibleForFree": true,
+  "isPartOf": {
+    "@type": "CreativeWorkSeries",
+    "name": "Musical Form Institute Research"
+  },
+  "citation": "Carter, D. S., and von Appen, R. (2025). Tempo Variability in Billboard Hot 100 Songs, 1966 through 1995. Integral, Vol. 38."
+}
+</script>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<main class="page-wide">
+
+  <nav class="topnav">
+    <a href="/">The Take Matters</a>
+    <a href="/writing/">Writing</a>
+    <a href="/research/" aria-current="page">Research</a>
+  </nav>
+
+  <section class="research-hero">
+    <div class="research-eyebrow">Research</div>
+    <h1>The Gridification of Popular Music</h1>
+    <p class="lede">Detected within-song timing variance across 66 years of Billboard Hot 100 number-one through number-five songs, 1960 through 2025. The grid arrived in 2001 and the chart shows what happened.</p>
+  </section>
+
+  <section class="research-section">
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="num">66</div>
+        <div class="label">Years analyzed</div>
+        <div class="sub">1960 through 2025</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">330</div>
+        <div class="label">Tracks measured</div>
+        <div class="sub">Top five year-end hits per year</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">51%</div>
+        <div class="label">Variance reduction</div>
+        <div class="sub">Pre vs post Beat Detective (2001)</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">2.4&times;</div>
+        <div class="label">Single-tempo rise</div>
+        <div class="sub">Tracks with zero detected variance</div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-top: 28px;">
+      <h3>Mean within-song tempo variance by year</h3>
+      <p class="chart-cap">Average detected standard deviation in beats per minute, calculated per track by Logic Pro tempo analysis and averaged within each year. Lower values mean tighter alignment to a single tempo across the whole song. Vertical markers indicate technology inflection points.</p>
+      <div class="chart-wrap">
+        <canvas id="chartHeadline"></canvas>
+      </div>
+      <div class="legend-note">An embodied human drummer playing to a click typically registers 0.6 to 1.2 BPM standard deviation. Values below 0.2 indicate sequenced or grid-corrected timing.</div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Five-year periods</h3>
+      <p class="chart-cap">Average tempo variance grouped into 5-year bands. Shows the long arc: relatively flat through the analog tape era, a step down in the early Pro Tools years, then a collapse after Beat Detective shipped.</p>
+      <div class="chart-wrap">
+        <canvas id="chartPeriods"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Share of top-five hits with zero detected tempo variance</h3>
+      <p class="chart-cap">Percentage of each year's top-five songs that returned a single Logic tempo with no detected timing transitions across the entire track. A single-tempo reading is the signature of a fully gridded recording.</p>
+      <div class="chart-wrap">
+        <canvas id="chartSingleTempo"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Share of top-five hits with a fade-out ending</h3>
+      <p class="chart-cap">Percentage of each year's top-five songs that end with a fade-out rather than a definitive ending. Fade-outs were the analog era's standard finish; they have effectively disappeared.</p>
+      <div class="chart-wrap">
+        <canvas id="chartFadeOut"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Distribution of within-song timing variance</h3>
+      <p class="chart-cap">All 330 tracks binned by detected standard deviation. The distribution splits cleanly: 96 tracks (29% of the dataset) cluster below 0.1 BPM &mdash; the floor below which embodied human performance does not register. The remaining tracks spread across the 0.5 to 5 BPM band typical of human-played timing. The narrow 0.1 to 0.5 BPM gap between them is sparse: a track is either gridded or it is not.</p>
+      <div class="chart-wrap">
+        <canvas id="chartHistogram"></canvas>
+      </div>
+      <div class="legend-note">The leftmost bin contains tracks with sequenced or grid-corrected timing. The remainder of the distribution reflects embodied performance, with or without a click track.</div>
+    </div>
+
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">By decade</div>
+    <h2 class="research-h2">Six and a half decades summarized</h2>
+    <p class="research-section-intro">Per-decade averages across the 330-track dataset. The median is the more honest central tendency here, since a handful of post-2010 outliers with intentional structural tempo changes inflate the mean. The median falls from 2.49 BPM in the 1960s to 0.00 in the 2010s and 2020s &mdash; meaning the median top-five hit of the last fifteen years registers no detected within-song timing variance at all.</p>
+
+    <div class="decade-table-wrap">
+      <table class="decade-table">
+        <thead>
+          <tr>
+            <th>Decade</th>
+            <th class="num">Tracks</th>
+            <th class="num">Mean STD (BPM)</th>
+            <th class="num">Median STD (BPM)</th>
+            <th class="num">Avg transitions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1960s</td><td class="num">50</td><td class="num">3.67</td><td class="num">2.49</td><td class="num">54</td></tr>
+          <tr><td>1970s</td><td class="num">50</td><td class="num">4.10</td><td class="num">2.06</td><td class="num">75</td></tr>
+          <tr><td>1980s</td><td class="num">50</td><td class="num">1.82</td><td class="num">0.86</td><td class="num">57</td></tr>
+          <tr><td>1990s</td><td class="num">50</td><td class="num">1.71</td><td class="num">0.40</td><td class="num">41</td></tr>
+          <tr><td>2000s</td><td class="num">50</td><td class="num">0.79</td><td class="num">0.26</td><td class="num">26</td></tr>
+          <tr><td>2010s</td><td class="num">50</td><td class="num">1.08</td><td class="num num-zero">0.00</td><td class="num">17</td></tr>
+          <tr><td>2020s</td><td class="num">30</td><td class="num">0.30</td><td class="num num-zero">0.00</td><td class="num">15</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="research-source-note" style="border-top:0;padding-top:14px;">The 2020s row covers six years (2020 through 2025), 30 tracks. Average tempo transitions per track fell from 75 in the 1970s to 15 in the 2020s &mdash; a fivefold reduction in detected within-song timing events.</p>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">Extremes of the dataset</div>
+    <h2 class="research-h2">The most and least flexible recordings</h2>
+    <p class="research-section-intro">The two ends of the distribution. The highest-variance tracks include songs with deliberate structural tempo shifts; the lowest-variance tracks are the first three top-five recordings in the dataset to register zero detected within-song variance.</p>
+
+    <div class="extremes-grid">
+      <div class="extremes-card">
+        <h3>Highest detected variance</h3>
+        <p class="extremes-cap">Standard deviation in beats per minute, full track. These recordings combine flexible performance with intentional structural tempo changes that the methodology flags as variance.</p>
+        <ul class="extremes-list">
+          <li>
+            <div>
+              <div class="extremes-song">You Light Up My Life</div>
+              <div class="extremes-meta">Debby Boone &middot; 1978 &middot; #3</div>
+            </div>
+            <div class="extremes-stat">31.86<span class="stat-unit">BPM</span></div>
+          </li>
+          <li>
+            <div>
+              <div class="extremes-song">American Pie</div>
+              <div class="extremes-meta">Don McLean &middot; 1972 &middot; #3</div>
+            </div>
+            <div class="extremes-stat">16.65<span class="stat-unit">BPM</span></div>
+          </li>
+          <li>
+            <div>
+              <div class="extremes-song">Aquarius / Let the Sunshine In</div>
+              <div class="extremes-meta">The 5th Dimension &middot; 1969 &middot; #2</div>
+            </div>
+            <div class="extremes-stat">13.43<span class="stat-unit">BPM</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="extremes-card">
+        <h3>First zero-variance top-five hits</h3>
+        <p class="extremes-cap">The earliest recordings in the dataset to return a single Logic tempo with no detected timing transitions across the full track. This is the production signature that becomes dominant after 2001.</p>
+        <ul class="extremes-list">
+          <li>
+            <div>
+              <div class="extremes-song">On My Own</div>
+              <div class="extremes-meta">Patti LaBelle and Michael McDonald &middot; 1986 &middot; #4</div>
+            </div>
+            <div class="extremes-stat">0.00<span class="stat-unit">BPM</span></div>
+          </li>
+          <li>
+            <div>
+              <div class="extremes-song">Nothing Compares 2 U</div>
+              <div class="extremes-meta">Sin&eacute;ad O'Connor &middot; 1990 &middot; #3</div>
+            </div>
+            <div class="extremes-stat">0.00<span class="stat-unit">BPM</span></div>
+          </li>
+          <li>
+            <div>
+              <div class="extremes-song">Gonna Make You Sweat (Everybody Dance Now)</div>
+              <div class="extremes-meta">C+C Music Factory &middot; 1991 &middot; #3</div>
+            </div>
+            <div class="extremes-stat">0.00<span class="stat-unit">BPM</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">Academic precursor</div>
+    <h2 class="research-h2">Extending Carter and von Appen</h2>
+    <p class="research-section-intro">This dataset extends the peer-reviewed analysis published by David S. Carter and Ralf von Appen in <a href="https://theory.esm.rochester.edu/integral/38-2025/carter-von-appen/" target="_blank" rel="noopener"><em>Int&eacute;gral</em> Vol. 38 (2025)</a>, &ldquo;Tempo Variability in Billboard Hot 100 Songs, 1966 through 1995.&rdquo; Their study established that tempo variability declined sharply beginning around 1979, attributable to the increasing use of click tracks and sequencing.</p>
+    <p class="research-section-intro">The Musical Form Institute's dataset uses comparable methodology (Logic Pro tempo detection rather than Melodyne, with the same statistical treatment) and applies it to the 66 years from 1960 through 2025. The continuation captures both Carter and von Appen's documented inflection at 1979 and a second, sharper inflection that begins after Pro Tools' Beat Detective shipped in 2001. The four coefficient-of-variation bands used in this dataset (Sequenced, Click Track, No Click, Free) are taken directly from Carter and von Appen's published thresholds.</p>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">Headline findings</div>
+    <h2 class="research-h2">What the data says</h2>
+    <ul class="findings-list">
+      <li>Mean tempo standard deviation across the year-end top five fell from approximately <strong>1.5 BPM</strong> in the late analog era to under <strong>0.5 BPM</strong> in the post-2001 Pro Tools era. A 51% reduction in detected within-song timing variance.</li>
+      <li>The share of top-five tracks returning <strong>zero detected tempo variance</strong> rose from roughly 27% before 2001 to about 63% after, a 2.4&times; increase. Several recent years show 80% or more of the top five with zero variance.</li>
+      <li>The fade-out ending, the dominant convention through the analog and early digital eras, fell from <strong>57%</strong> of top-five tracks before 2001 to <strong>17%</strong> after. In many recent years, the entire top five contains zero fade-outs.</li>
+      <li>The same artists, recording with the same broad instrumentation a decade apart, often show a measurable collapse from <strong>flexible timing</strong> in their early hits to <strong>zero variance</strong> in their later ones.</li>
+    </ul>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">Companion essays</div>
+    <h2 class="research-h2">The interpretive work the dataset supports</h2>
+    <p class="research-section-intro">The empirical findings on this page are the basis for two essays that take up the broader question of what the measured shift means for listeners, music makers, and civic life.</p>
+
+    <div class="research-grid" style="grid-template-columns: 1fr 1fr; margin-top: 24px;">
+      <a href="/research/perfect-music-democracy.pdf" target="_blank" rel="noopener" class="research-card">
+        <span class="research-tag">Essay one</span>
+        <h3>Does &lsquo;Perfect&rsquo; Music Make Us Worse at Democracy?</h3>
+        <p>Contrasting Taylor Swift's <em>Opalite</em> (std dev 0.02 BPM) with Fleetwood Mac's <em>Dreams</em> (std dev 1.82 BPM), the essay uses Susanne Langer's account of presentational symbolism to argue that the difference is categorical, not stylistic, and that the civic stakes follow.</p>
+        <span class="cta">Read the essay (PDF) &darr;</span>
+      </a>
+
+      <a href="/research/listening-to-ai-25-years.pdf" target="_blank" rel="noopener" class="research-card">
+        <span class="research-tag">Essay two</span>
+        <h3>You've Been Listening to AI Music for 25 Years</h3>
+        <p>The relevant inflection point is not the arrival of generative AI; it is the institutionalization of Beat Detective in Pro Tools TDM 5.1 in 2001. Once human performance was sliced, quantized, and reassembled to a grid, the structural distinction between human and machine production collapsed.</p>
+        <span class="cta">Read the essay (PDF) &darr;</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="research-section">
+    <div class="research-eyebrow">Methodology</div>
+    <h2 class="research-h2">How the measurements were taken</h2>
+    <ul class="method-list">
+      <li><strong>Source</strong><span>Billboard Hot 100 year-end charts. Top five (#1 through #5) per year, 1960 through 2025. Total: 330 recordings.</span></li>
+      <li><strong>Audio source</strong><span>YouTube canonical recording per track, captured to lossless system audio.</span></li>
+      <li><strong>Tempo analysis</strong><span>Logic Pro tempo detection on each full track. Mean tempo, within-song standard deviation, minimum, maximum, and number of detected tempo transitions recorded.</span></li>
+      <li><strong>Reliability</strong><span>Test-retest reliability: mean tempo within 0.05%, standard deviation within 5 to 10%. The order-of-magnitude differences in this dataset are far above the noise floor.</span></li>
+      <li><strong>Categories</strong><span>Tracks classified by coefficient of variation into four bands following Carter and von Appen: Sequenced (CV below 0.2), Click Track (CV 0.2 to 0.5), No Click (CV 0.5 to 2.0), Free or Shifting (CV above 2.0).</span></li>
+      <li><strong>Caveat</strong><span>Some post-2010 outlier years are driven by individual tracks with intentional structural tempo changes (intros at different tempos, ritardando endings). Within-section timing in those tracks is still tightly gridded; the spike reflects musical features rather than embodied performance.</span></li>
+    </ul>
+
+    <p class="research-source-note">For questions about the methodology or to request the underlying dataset, contact <a href="mailto:research@musicalform.org">research@musicalform.org</a>. This research is conducted by Jeffrey Anthony and published by the <a href="https://musicalform.org/research/gridification" target="_blank" rel="noopener">Musical Form Institute</a>, which is its canonical home.</p>
+  </section>
+
+  <footer class="footer">
+    <p>&copy; 2026 The Take Matters. All rights reserved.</p>
+  </footer>
+
+</main>
+
+<script>
+(function() {
+  "use strict";
+
+  var RUST = '#b8623a';
+  var SLATE = '#5b6675';
+
+  Chart.defaults.font.family = "'Inter', -apple-system, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = '#555';
+
+  function centeredMovingAvg(data, window) {
+    var half = Math.floor(window / 2);
+    return data.map(function(_, i) {
+      var sum = 0, count = 0;
+      for (var j = Math.max(0, i - half); j <= Math.min(data.length - 1, i + half); j++) {
+        if (data[j] != null && !isNaN(data[j])) { sum += data[j]; count++; }
+      }
+      return count ? sum / count : null;
+    });
+  }
+
+  fetch('/research/gridification/data.json')
+    .then(function(r) { return r.json(); })
+    .then(function(payload) {
+      var tracks = payload.tracks || [];
+      var byYear = {};
+      tracks.forEach(function(t) {
+        if (typeof t.year !== 'number') return;
+        (byYear[t.year] = byYear[t.year] || []).push(t);
+      });
+      var years = Object.keys(byYear).map(Number).sort(function(a, b) { return a - b; });
+
+      var meanStdDevByYear = years.map(function(y) {
+        var list = byYear[y].filter(function(t) { return typeof t.std_dev === 'number'; });
+        if (!list.length) return null;
+        return list.reduce(function(s, t) { return s + t.std_dev; }, 0) / list.length;
+      });
+
+      var singleTempoPctByYear = years.map(function(y) {
+        var list = byYear[y];
+        var single = list.filter(function(t) { return (t.std_dev || 0) < 0.05; }).length;
+        return list.length ? (single / list.length) * 100 : 0;
+      });
+
+      var fadeOutPctByYear = years.map(function(y) {
+        var list = byYear[y];
+        var fades = list.filter(function(t) { return /fade/i.test(t.notes || ''); }).length;
+        return list.length ? (fades / list.length) * 100 : 0;
+      });
+
+      new Chart(document.getElementById('chartHeadline').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: [
+            { label: 'Year-by-year', data: meanStdDevByYear, borderColor: 'rgba(184,98,58,0.35)', backgroundColor: 'rgba(184,98,58,0.06)', borderWidth: 1.5, tension: 0.25, fill: true, pointRadius: 1.5, pointHoverRadius: 4 },
+            { label: '5-year smoothed', data: centeredMovingAvg(meanStdDevByYear, 5), borderColor: SLATE, backgroundColor: 'transparent', borderWidth: 3, tension: 0.4, fill: false, pointRadius: 0, pointHoverRadius: 0 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { boxWidth: 14, padding: 14 } },
+            tooltip: { callbacks: { title: function(items) { return items[0].label; }, label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + ' BPM'; } } }
+          },
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Std dev (BPM)' } }, x: { ticks: { maxTicksLimit: 14 } } }
+        }
+      });
+
+      var periods = [];
+      for (var start = 1960; start <= 2025; start += 5) {
+        var end = Math.min(start + 4, 2025);
+        var label = start + '-' + String(end).slice(2);
+        var yearsInPeriod = years.filter(function(y) { return y >= start && y <= end; });
+        var allTracks = yearsInPeriod.reduce(function(acc, y) { return acc.concat(byYear[y]); }, []).filter(function(t) { return typeof t.std_dev === 'number'; });
+        var avg = allTracks.length ? allTracks.reduce(function(s, t) { return s + t.std_dev; }, 0) / allTracks.length : null;
+        periods.push({ label: label, avg: avg, n: allTracks.length });
+      }
+
+      new Chart(document.getElementById('chartPeriods').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: periods.map(function(p) { return p.label; }),
+          datasets: [{
+            label: 'Average std dev (BPM)',
+            data: periods.map(function(p) { return p.avg; }),
+            backgroundColor: periods.map(function(p) {
+              var s = parseInt(p.label.split('-')[0], 10);
+              return s < 2001 ? SLATE : RUST;
+            }),
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return 'Avg std dev: ' + ctx.parsed.y.toFixed(2) + ' BPM (n=' + periods[ctx.dataIndex].n + ')'; } } } },
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Avg std dev (BPM)' } } }
+        }
+      });
+
+      new Chart(document.getElementById('chartSingleTempo').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: [{ label: 'Zero-variance tracks (% of top 5)', data: singleTempoPctByYear, borderColor: RUST, backgroundColor: 'rgba(184,98,58,0.10)', borderWidth: 2, tension: 0.25, fill: true, pointRadius: 2, pointHoverRadius: 5 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y.toFixed(0) + '%'; } } } },
+          scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Percent of top five' } }, x: { ticks: { maxTicksLimit: 14 } } }
+        }
+      });
+
+      new Chart(document.getElementById('chartFadeOut').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: [
+            { label: 'Year-by-year', data: fadeOutPctByYear, borderColor: 'rgba(184,98,58,0.35)', backgroundColor: 'rgba(184,98,58,0.06)', borderWidth: 1.5, tension: 0.25, fill: true, pointRadius: 1.5, pointHoverRadius: 4 },
+            { label: '5-year smoothed', data: centeredMovingAvg(fadeOutPctByYear, 5), borderColor: SLATE, backgroundColor: 'transparent', borderWidth: 3, tension: 0.4, fill: false, pointRadius: 0, pointHoverRadius: 0 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 14, padding: 14 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0) + '%'; } } } },
+          scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Percent of top five' } }, x: { ticks: { maxTicksLimit: 14 } } }
+        }
+      });
+
+      var histBins = [
+        { lbl: '0–0.1', lo: 0, hi: 0.1 },
+        { lbl: '0.1–0.5', lo: 0.1, hi: 0.5 },
+        { lbl: '0.5–1.0', lo: 0.5, hi: 1.0 },
+        { lbl: '1–2', lo: 1.0, hi: 2.0 },
+        { lbl: '2–5', lo: 2.0, hi: 5.0 },
+        { lbl: '5–10', lo: 5.0, hi: 10.0 },
+        { lbl: '10+', lo: 10.0, hi: Infinity }
+      ];
+      var trackTotal = tracks.filter(function(t) { return typeof t.std_dev === 'number'; }).length;
+      var histCounts = histBins.map(function(b) {
+        return tracks.filter(function(t) { return typeof t.std_dev === 'number' && t.std_dev >= b.lo && t.std_dev < b.hi; }).length;
+      });
+
+      new Chart(document.getElementById('chartHistogram').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: histBins.map(function(b) { return b.lbl; }),
+          datasets: [{ label: 'Track count', data: histCounts, backgroundColor: histBins.map(function(b, i) { return i === 0 ? SLATE : RUST; }), borderWidth: 0 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { var n = ctx.parsed.y; var pct = trackTotal ? (n / trackTotal * 100).toFixed(0) : 0; return n + ' tracks (' + pct + '% of dataset)'; } } } },
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Number of tracks' } }, x: { title: { display: true, text: 'Within-song standard deviation (BPM)' } } }
+        }
+      });
+    })
+    .catch(function(err) { console.error('Failed to load gridification data:', err); });
+})();
+</script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+
+</body>
+</html>
