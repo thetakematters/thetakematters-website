@@ -1,0 +1,46 @@
+name: Refresh writing from Medium
+
+# Pulls the latest posts from Jeffrey's Medium feed and regenerates
+# /writing/index.html. Runs daily and can be triggered by hand.
+# Everything here is first-party GitHub Actions; the resulting push
+# triggers the existing Vercel deploy. No third-party services.
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # daily at 11:00 UTC
+  workflow_dispatch: {}     # manual "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-writing
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Regenerate writing page from Medium feed
+        run: python3 scripts/build_writing.py
+
+      - name: Commit and push if the page changed
+        run: |
+          if [ -n "$(git status --porcelain writing/index.html)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add writing/index.html
+            git commit -m "Auto-refresh writing page from Medium feed"
+            git push
+            echo "Pushed updated writing page. Vercel will redeploy."
+          else
+            echo "No change in writing page. Nothing to commit."
+          fi
