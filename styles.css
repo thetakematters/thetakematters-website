@@ -224,10 +224,14 @@ a:hover {
 }
 
 .writing-card {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  position: relative;
   background: #fff;
   border: 1px solid var(--rule);
   border-radius: 8px;
-  padding: 24px 26px;
+  padding: 22px 24px;
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -235,6 +239,20 @@ a:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+}
+
+.writing-thumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.writing-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .writing-title {
@@ -245,6 +263,19 @@ a:hover {
   letter-spacing: -0.3px;
   line-height: 1.35;
   border-bottom: none;
+}
+
+/* Stretched link: the whole card becomes one click target while
+   keeping a single real, screen-reader-friendly anchor (the title). */
+.writing-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+}
+
+.writing-card:hover .writing-title {
+  color: var(--accent);
 }
 
 .writing-title:hover {
@@ -301,7 +332,13 @@ a:hover {
   }
 
   .writing-card {
-    padding: 20px;
+    padding: 18px;
+    gap: 14px;
+  }
+
+  .writing-thumb {
+    width: 72px;
+    height: 72px;
   }
 
   .writing-title {

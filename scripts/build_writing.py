@@ -99,6 +99,16 @@ def parse_items(xml):
         dek = clean_dek(desc)
         if dek == title:
             dek = ""
+        img_m = re.search(r'<img[^>]+src="([^"]+)"', desc)
+        image = img_m.group(1).strip() if img_m else ""
+        if image:
+            # Medium's CDN honors a width segment. Original heroes are
+            # ~2MB; a 320px crop is ~24KB and plenty for a thumbnail.
+            image = re.sub(
+                r"(cdn-images-1\.medium\.com)/max/\d+/",
+                r"\1/max/320/",
+                image,
+            )
         cats = [
             cdata(c).strip()
             for c in re.findall(r"<category>(.*?)</category>", it, re.S)
@@ -114,6 +124,7 @@ def parse_items(xml):
                 "date_iso": date_iso,
                 "dek": dek,
                 "tags": cats,
+                "image": image,
             }
         )
     return posts
@@ -132,12 +143,19 @@ def render_card(p):
         tags = f'<div class="writing-tags">{chips}</div>'
     dek = f'<p class="writing-dek">{esc(p["dek"])}</p>' if p["dek"] else ""
     date_attr = f' datetime="{p["date_iso"]}"' if p["date_iso"] else ""
+    thumb = (
+        f'<img class="writing-thumb" src="{esc(p["image"])}" alt="" loading="lazy">\n        '
+        if p["image"]
+        else ""
+    )
     return f"""      <article class="writing-card">
-        <a class="writing-title" href="{esc(p['link'])}" target="_blank" rel="noopener">{esc(p['title'])}</a>
-        {dek}
-        <div class="writing-meta">
-          <time{date_attr}>{esc(p['date_h'])}</time>
-          {tags}
+        {thumb}<div class="writing-body">
+          <a class="writing-title" href="{esc(p['link'])}" target="_blank" rel="noopener">{esc(p['title'])}</a>
+          {dek}
+          <div class="writing-meta">
+            <time{date_attr}>{esc(p['date_h'])}</time>
+            {tags}
+          </div>
         </div>
       </article>"""
 
