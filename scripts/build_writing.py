@@ -170,12 +170,12 @@ PAGE = """<!DOCTYPE html>
 <meta property="og:title" content="Writing | Jeffrey Anthony">
 <meta property="og:description" content="Essays by Jeffrey Anthony on music, AI, philosophy, and culture.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://thetakematters.com/writing/">
+<meta property="og:url" content="https://www.thetakematters.com/writing/">
 <meta property="og:site_name" content="The Take Matters">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Writing | Jeffrey Anthony">
 <meta name="twitter:description" content="Essays by Jeffrey Anthony on music, AI, philosophy, and culture.">
-<link rel="canonical" href="https://thetakematters.com/writing/">
+<link rel="canonical" href="https://www.thetakematters.com/writing/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
