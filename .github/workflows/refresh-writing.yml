@@ -6,8 +6,12 @@ name: Refresh writing from Medium
 # triggers the existing Vercel deploy. No third-party services.
 
 on:
-  schedule:
-    - cron: '0 11 * * *'   # daily at 11:00 UTC
+  # Daily auto-refresh DISABLED 2026-07-12. Medium serves GitHub's runners a
+  # stale, cached copy of the RSS feed, so scheduled runs kept reverting the
+  # page to older articles. Refresh manually with the "Run workflow" button
+  # below, or run scripts/build_writing.py locally (which gets the fresh feed).
+  # schedule:
+  #   - cron: '0 11 * * *'   # daily at 11:00 UTC
   workflow_dispatch: {}     # manual "Run workflow" button in the Actions tab
 
 permissions:
