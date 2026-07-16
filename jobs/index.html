@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Job Search</title>
+<style>
+:root{--text:#1a1a1a;--text-secondary:#555;--text-tertiary:#888;--accent:#b8623a;
+--bg:#fafaf7;--rule:#e5e5e2;--green:#1f7a3f;--amber:#a8720d;--red:#a33}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+.login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:36px;max-width:380px;width:100%}
+.login-box h1{font-size:19px;margin-bottom:2px}
+.login-box .sub{font-size:13px;color:var(--text-tertiary);margin-bottom:20px}
+.login-box input{width:100%;padding:10px 12px;border:1px solid var(--rule);border-radius:6px;
+font:inherit;font-size:14px;margin-bottom:10px;background:var(--bg)}
+.login-box input:focus{outline:none;border-color:var(--accent)}
+.err{color:var(--red);font-size:12.5px;margin-bottom:10px;display:none}
+.btn{display:inline-block;border:none;border-radius:6px;padding:9px 16px;font:inherit;
+font-size:13.5px;font-weight:600;cursor:pointer;background:#eee;color:var(--text)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:#fff;color:var(--red);border:1px solid var(--red)}
+.btn:disabled{opacity:.5;cursor:default}
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--rule);
+background:#fff;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:16px;margin-right:auto}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid var(--rule);background:#fff}
+.tab.active{background:var(--text);color:#fff;border-color:var(--text)}
+main{max-width:880px;margin:0 auto;padding:20px}
+.card{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+.card h3{font-size:15px;margin-bottom:2px}
+.card h3 a{color:var(--text);text-decoration:none}
+.card h3 a:hover{color:var(--accent)}
+.meta{font-size:12.5px;color:var(--text-secondary);margin-bottom:8px}
+.score{float:right;font-weight:700;font-size:16px;margin-left:12px}
+.s-apply{color:var(--green)}.s-review{color:var(--amber)}.s-low{color:var(--text-tertiary)}
+.notes{font-size:12.5px;color:var(--text-secondary);background:var(--bg);border-radius:6px;
+padding:8px 10px;white-space:pre-wrap;margin-bottom:10px;max-height:150px;overflow-y:auto}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:10px;background:var(--bg);
+border:1px solid var(--rule);color:var(--text-secondary)}
+.empty{color:var(--text-tertiary);text-align:center;padding:40px 0}
+.count{font-size:12px;color:var(--text-tertiary);margin-left:4px}
+footer{max-width:880px;margin:0 auto;padding:8px 20px 40px;font-size:12px;color:var(--text-tertiary)}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login">
+  <div class="login-box">
+    <h1>Job Search</h1>
+    <div class="sub">Private dashboard</div>
+    <div id="loginErr" class="err">Sign-in failed</div>
+    <input type="email" id="email" placeholder="Email" autocomplete="username" value="jeffrey@musicalform.org">
+    <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
+    <button id="loginBtn" class="btn btn-primary" style="width:100%">Sign in</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>Job Search</h1>
+    <nav class="tabs" id="tabs"></nav>
+    <button class="btn" id="refreshBtn" title="Reload">&#8635;</button>
+    <button class="btn" id="outBtn">Sign out</button>
+  </header>
+  <main id="list"></main>
+  <footer id="stats"></footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+var SB_URL = 'https://ybfaykwwnirjwabmgsqu.supabase.co';
+var SB_KEY = 'sb_publishable__doHKn0KYVVPUnYqVdchnw_TBUq5eYy';
+var sb = window.supabase.createClient(SB_URL, SB_KEY);
+var $ = function(id){ return document.getElementById(id); };
+
+var TABS = [
+  {key:'apply',   label:'Apply',    q:{col:'status', val:['apply']}},
+  {key:'review',  label:'Review',   q:{col:'status', val:['review']}},
+  {key:'archive', label:'Archive',  q:{col:'status', val:['archive']}, limit:60},
+  {key:'decided', label:'Decided',  q:{col:'status', val:['applied','user_rejected']}},
+  {key:'closed',  label:'Closed',   q:{col:'status', val:['closed']}, limit:40}
+];
+var current = 'apply';
+
+function fmtSalary(j){
+  if (j.salary_min && j.salary_max)
+    return '$' + Math.round(j.salary_min/1000) + 'K-$' + Math.round(j.salary_max/1000) + 'K';
+  if (j.salary_raw) return j.salary_raw.slice(0, 50);
+  return '';
+}
+
+function scoreClass(s){ return s >= 80 ? 's-apply' : s >= 65 ? 's-review' : 's-low'; }
+
+function card(j){
+  var el = document.createElement('div'); el.className = 'card';
+  var sal = fmtSalary(j);
+  var h = '';
+  if (j.score !== null) h += '<span class="score ' + scoreClass(j.score) + '">' + j.score + '</span>';
+  h += '<h3><a href="' + j.canonical_url + '" target="_blank" rel="noopener">' + esc(j.title) + '</a></h3>';
+  h += '<div class="meta">' + esc(j.employer_name) + ' &middot; ' + esc(j.location || 'location unlisted');
+  if (sal) h += ' &middot; ' + esc(sal);
+  if (j.status === 'applied') h += ' &middot; <span class="pill">applied</span>';
+  if (j.status === 'user_rejected') h += ' &middot; <span class="pill">passed: ' + esc(j.user_reason || '') + '</span>';
+  if (j.status === 'closed') h += ' &middot; <span class="pill">closed</span>';
+  h += '</div>';
+  if (j.score_notes) h += '<div class="notes">' + esc(j.score_notes) + '</div>';
+  el.innerHTML = h;
+
+  if (['apply','review','archive'].indexOf(j.status) >= 0){
+    var act = document.createElement('div'); act.className = 'actions';
+    act.appendChild(btn('Applied', 'btn btn-green', function(){ setStatus(j, 'applied', null); }));
+    act.appendChild(btn('Not for me', 'btn btn-red', function(){
+      var r = prompt('Why not? (one line, this tunes the scorer)');
+      if (r !== null) setStatus(j, 'user_rejected', r || 'no reason given');
+    }));
+    el.appendChild(act);
+  } else if (j.status === 'applied' || j.status === 'user_rejected'){
+    var act2 = document.createElement('div'); act2.className = 'actions';
+    act2.appendChild(btn('Undo', 'btn', function(){
+      setStatus(j, (j.score||0) >= 80 ? 'apply' : (j.score||0) >= 65 ? 'review' : 'archive', null);
+    }));
+    el.appendChild(act2);
+  }
+  return el;
+}
+
+function btn(t, cls, fn){ var b = document.createElement('button'); b.className = cls; b.textContent = t; b.onclick = fn; return b; }
+function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+function setStatus(j, status, reason){
+  var body = {status: status};
+  if (reason !== null) body.user_reason = reason;
+  sb.from('jobs').update(body).eq('id', j.id).then(function(r){
+    if (r.error) alert('Update failed: ' + r.error.message);
+    else load();
+  });
+}
+
+function load(){
+  var t = TABS.filter(function(x){ return x.key === current; })[0];
+  var q = sb.from('jobs')
+    .select('id,employer_name,title,location,salary_min,salary_max,salary_raw,score,score_notes,status,user_reason,canonical_url')
+    .in(t.q.col, t.q.val)
+    .order('score', {ascending:false, nullsFirst:false})
+    .limit(t.limit || 200);
+  q.then(function(r){
+    var list = $('list'); list.innerHTML = '';
+    if (r.error){ list.innerHTML = '<div class="empty">' + esc(r.error.message) + '</div>'; return; }
+    if (!r.data.length){ list.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+    r.data.forEach(function(j){ list.appendChild(card(j)); });
+  });
+  sb.from('jobs').select('status').then(function(r){
+    if (r.error || !r.data) return;
+    var c = {};
+    r.data.forEach(function(x){ c[x.status] = (c[x.status]||0) + 1; });
+    $('stats').textContent = 'Database: ' + Object.keys(c).sort().map(function(k){ return k + ' ' + c[k]; }).join(', ');
+    TABS.forEach(function(tb){
+      var n = tb.q.val.reduce(function(a, s){ return a + (c[s]||0); }, 0);
+      $('tab-' + tb.key).innerHTML = tb.label + '<span class="count">' + n + '</span>';
+    });
+  });
+}
+
+function drawTabs(){
+  var n = $('tabs'); n.innerHTML = '';
+  TABS.forEach(function(t){
+    var b = document.createElement('button');
+    b.className = 'tab' + (t.key === current ? ' active' : ''); b.id = 'tab-' + t.key;
+    b.textContent = t.label;
+    b.onclick = function(){ current = t.key; drawTabs(); load(); };
+    n.appendChild(b);
+  });
+}
+
+function show(loggedIn){
+  $('loginScreen').style.display = loggedIn ? 'none' : 'flex';
+  $('app').style.display = loggedIn ? 'block' : 'none';
+  if (loggedIn){ drawTabs(); load(); }
+}
+
+$('loginBtn').onclick = function(){
+  sb.auth.signInWithPassword({email: $('email').value.trim(), password: $('pass').value})
+    .then(function(r){
+      if (r.error){ $('loginErr').textContent = r.error.message; $('loginErr').style.display = 'block'; }
+      else show(true);
+    });
+};
+$('pass').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('loginBtn').click(); });
+$('outBtn').onclick = function(){ sb.auth.signOut().then(function(){ show(false); }); };
+$('refreshBtn').onclick = load;
+
+sb.auth.getSession().then(function(r){ show(!!(r.data && r.data.session)); });
+</script>
+</body>
+</html>

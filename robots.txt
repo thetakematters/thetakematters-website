@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /jobs/
 
 Sitemap: https://www.thetakematters.com/sitemap.xml
