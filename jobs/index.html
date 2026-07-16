@@ -159,11 +159,16 @@ function load(){
     if (!r.data.length){ list.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
     r.data.forEach(function(j){ list.appendChild(card(j)); });
   });
-  sb.from('jobs').select('status').then(function(r){
-    if (r.error || !r.data) return;
+  // exact server-side counts; a plain select is capped at 1000 rows and
+  // undercounts once the table grows past that
+  var statuses = ['apply','review','queued','archive','auto_rejected','applied','user_rejected','closed'];
+  Promise.all(statuses.map(function(s){
+    return sb.from('jobs').select('id', {count: 'exact', head: true}).eq('status', s)
+      .then(function(r){ return [s, r.count || 0]; });
+  })).then(function(pairs){
     var c = {};
-    r.data.forEach(function(x){ c[x.status] = (c[x.status]||0) + 1; });
-    $('stats').textContent = 'Database: ' + Object.keys(c).sort().map(function(k){ return k + ' ' + c[k]; }).join(', ');
+    pairs.forEach(function(p){ c[p[0]] = p[1]; });
+    $('stats').textContent = 'Database: ' + statuses.map(function(k){ return k + ' ' + c[k]; }).join(', ');
     TABS.forEach(function(tb){
       var n = tb.q.val.reduce(function(a, s){ return a + (c[s]||0); }, 0);
       $('tab-' + tb.key).innerHTML = tb.label + '<span class="count">' + n + '</span>';
