@@ -119,8 +119,7 @@ function card(j){
     var act = document.createElement('div'); act.className = 'actions';
     act.appendChild(btn('Applied', 'btn btn-green', function(){ setStatus(j, 'applied', null); }));
     act.appendChild(btn('Not for me', 'btn btn-red', function(){
-      var r = prompt('Why not? (one line, this tunes the scorer)');
-      if (r !== null) setStatus(j, 'user_rejected', r || 'no reason given');
+      setStatus(j, 'user_rejected', null);
     }));
     el.appendChild(act);
   } else if (j.status === 'applied' || j.status === 'user_rejected'){
