@@ -86,7 +86,9 @@ var TABS = [
   {key:'queued',  label:'Queued',   q:{col:'status', val:['queued']}, limit:100},
   {key:'archive', label:'Archive',  q:{col:'status', val:['archive']}, limit:60},
   {key:'decided', label:'Decided',  q:{col:'status', val:['applied','user_rejected']}},
-  {key:'closed',  label:'Closed',   q:{col:'status', val:['closed']}, limit:40}
+  {key:'closed',  label:'Closed',   q:{col:'status', val:['closed']}, limit:40},
+  {key:'opps',    label:'Opportunities', table:'opportunities',
+   q:{col:'status', val:['new','watch','pursue']}, limit:200}
 ];
 var current = 'apply';
 
@@ -146,18 +148,67 @@ function setStatus(j, status, reason){
 
 function load(){
   var t = TABS.filter(function(x){ return x.key === current; })[0];
-  var q = sb.from('jobs')
+  if (t.table === 'opportunities') loadOpps(t);
+  else loadJobs(t);
+  updateCounts();
+}
+
+function loadJobs(t){
+  sb.from('jobs')
     .select('id,employer_name,title,location,salary_min,salary_max,salary_raw,score,score_notes,status,user_reason,canonical_url')
     .in(t.q.col, t.q.val)
     .order('score', {ascending:false, nullsFirst:false})
     .order('first_seen', {ascending:false})
-    .limit(t.limit || 200);
-  q.then(function(r){
-    var list = $('list'); list.innerHTML = '';
-    if (r.error){ list.innerHTML = '<div class="empty">' + esc(r.error.message) + '</div>'; return; }
-    if (!r.data.length){ list.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
-    r.data.forEach(function(j){ list.appendChild(card(j)); });
-  });
+    .limit(t.limit || 200)
+    .then(function(r){
+      var list = $('list'); list.innerHTML = '';
+      if (r.error){ list.innerHTML = '<div class="empty">' + esc(r.error.message) + '</div>'; return; }
+      if (!r.data.length){ list.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+      r.data.forEach(function(j){ list.appendChild(card(j)); });
+    });
+}
+
+function loadOpps(t){
+  sb.from('opportunities')
+    .select('id,kind,source,title,org,location,url,deadline,status,description')
+    .in('status', t.q.val)
+    .order('deadline', {ascending:true, nullsFirst:false})
+    .limit(t.limit || 200)
+    .then(function(r){
+      var list = $('list'); list.innerHTML = '';
+      if (r.error){ list.innerHTML = '<div class="empty">' + esc(r.error.message) + '</div>'; return; }
+      if (!r.data.length){ list.innerHTML = '<div class="empty">No opportunities.</div>'; return; }
+      r.data.forEach(function(o){ list.appendChild(oppCard(o)); });
+    });
+}
+
+function oppCard(o){
+  var el = document.createElement('div'); el.className = 'card';
+  var h = '<h3><a href="' + (o.url || '#') + '" target="_blank" rel="noopener">' + esc(o.title) + '</a></h3>';
+  h += '<div class="meta">' + esc(o.org || '');
+  if (o.location) h += ' &middot; ' + esc(o.location);
+  h += ' &middot; <span class="pill">' + esc(o.kind) + '</span>';
+  h += o.deadline ? ' &middot; due ' + esc(o.deadline) : ' &middot; rolling';
+  h += ' &middot; <span class="pill">' + esc(o.status) + '</span></div>';
+  if (o.description) h += '<div class="notes">' + esc(o.description) + '</div>';
+  el.innerHTML = h;
+  var act = document.createElement('div'); act.className = 'actions';
+  act.appendChild(btn('Watch',   'btn',         function(){ setOppStatus(o, 'watch'); }));
+  act.appendChild(btn('Pursue',  'btn btn-green', function(){ setOppStatus(o, 'pursue'); }));
+  act.appendChild(btn('Dismiss', 'btn btn-red',   function(){ setOppStatus(o, 'dismissed'); }));
+  el.appendChild(act);
+  return el;
+}
+
+function setOppStatus(o, status){
+  sb.from('opportunities').update({status: status, updated_at: new Date().toISOString()})
+    .eq('id', o.id).then(function(r){
+      if (r.error) alert('Update failed: ' + r.error.message);
+      else load();
+    });
+}
+
+function updateCounts(){
   // exact server-side counts; a plain select is capped at 1000 rows and
   // undercounts once the table grows past that
   var statuses = ['apply','review','queued','archive','auto_rejected','applied','user_rejected','closed'];
@@ -169,10 +220,13 @@ function load(){
     pairs.forEach(function(p){ c[p[0]] = p[1]; });
     $('stats').textContent = 'Database: ' + statuses.map(function(k){ return k + ' ' + c[k]; }).join(', ');
     TABS.forEach(function(tb){
+      if (tb.table === 'opportunities') return;
       var n = tb.q.val.reduce(function(a, s){ return a + (c[s]||0); }, 0);
-      $('tab-' + tb.key).innerHTML = tb.label + '<span class="count">' + n + '</span>';
+      var el = $('tab-' + tb.key); if (el) el.innerHTML = tb.label + '<span class="count">' + n + '</span>';
     });
   });
+  sb.from('opportunities').select('id', {count:'exact', head:true}).in('status', ['new','watch','pursue'])
+    .then(function(r){ var el = $('tab-opps'); if (el) el.innerHTML = 'Opportunities<span class="count">' + (r.count||0) + '</span>'; });
 }
 
 function drawTabs(){
