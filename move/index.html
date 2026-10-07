@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Portland Move</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<!--
+  Portland move board (6 Oct 2026). Private: Supabase Auth sign-in, and row level
+  security lets only addresses on move_editors read or change anything. Tabs are
+  rows in move_rows (one table, data jsonb holds the cells), so a new column needs
+  no database change. The page never deletes: it archives, and every edit first
+  copies the earlier row to move_versions. The Jobs tab reads the job scan tables.
+  Same look as the Oregon Sound Circuit notebook. Local preview with demo data:
+  http://localhost:PORT/move/?demo (localhost only, nothing is saved).
+-->
+<style>
+:root{--ink:#1B2430;--slate:#566070;--ink3:#646B78;--paper:#FBF8F3;--card:#FFFFFF;--mist:#F3EEE6;
+  --rule:#E7E1D7;--rule2:#D5CDBF;--line2:rgba(27,36,48,.24);
+  --navy:#0F2742;--navy2:#1D3E63;--sky:#C9D6E3;--teal:#0A8F9C;--teal-t:#086670;--teal-tint:#E6F1F1;
+  --coral:#E8603C;--coral-t:#A63D1C;--amber:#F2B33D;--amber-t:#7A4F00;
+  --serif:'Newsreader',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--teal-t);text-decoration-thickness:1px;text-underline-offset:3px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal-t);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);padding:7px 14px;font-weight:600;font-size:15px;cursor:pointer;border-radius:10px;white-space:nowrap;text-decoration:none}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.quiet{border-color:var(--line2)}
+.btn.small{padding:5px 12px;font-size:14.5px}
+.btn:disabled{opacity:.6;cursor:default}
+.btn-w{background:none;border:1.5px solid rgba(255,255,255,.55);color:#fff;border-radius:10px;padding:5px 12px;font-size:14.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-w:hover{background:rgba(255,255,255,.1)}
+.mini{background:none;border:0;padding:3px 7px;font-size:14px;font-weight:600;color:var(--slate);cursor:pointer;border-radius:7px;white-space:nowrap}
+.mini:hover{background:var(--mist);color:var(--ink)}
+.mini.warn{color:var(--coral-t)}
+.addrow{display:block;width:100%;margin:14px 0 0;background:none;border:1.5px dashed var(--rule2);border-radius:14px;padding:12px;font-size:15.5px;font-weight:600;color:var(--slate);cursor:pointer;text-align:center}
+.addrow:hover{border-color:var(--teal);color:var(--teal-t);background:#fff}
+
+/* sign in and notices */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px}
+.gate-card{width:min(460px,100%);background:var(--card);border:1px solid var(--rule);border-radius:18px;padding:30px 30px 26px}
+.gate-card h1{font:500 40px/1.05 var(--serif);margin:6px 0 8px;letter-spacing:-.015em}
+.gate-card p{margin:0 0 18px;color:var(--slate);font-size:16.5px}
+.eyebrow{font:500 13px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--teal-t);margin:0}
+.fld{display:block;margin:0 0 14px}
+.fld span{display:block;font-size:14px;font-weight:600;margin:0 0 5px}
+.fld input{width:100%;border:1.5px solid var(--line2);border-radius:10px;padding:9px 12px;font-size:16px;background:#fff}
+.err{background:#FBE9E2;border-left:4px solid var(--coral);border-radius:0 10px 10px 0;padding:9px 12px;font-size:15px;color:var(--ink);margin:0 0 16px}
+.demo{background:#FFF7E3;border-bottom:1px solid #EBD9A8;font-size:14px;text-align:center;padding:7px 16px}
+
+/* masthead and cover */
+.mast{background:var(--navy);color:#fff}
+.mast .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px}
+.brand{font:500 13px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+.mast-r{display:flex;align-items:center;gap:14px;font-size:14px;color:#D5DEE8;min-width:0}
+.mast-r .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cover{background:var(--navy);color:#fff;position:relative;overflow:hidden;border-top:1px solid rgba(255,255,255,.08)}
+.cover::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(900px 420px at 88% -10%,rgba(10,143,156,.35),transparent 60%),radial-gradient(700px 380px at 105% 110%,rgba(242,179,61,.16),transparent 60%)}
+.cover .wrap{position:relative;padding-top:26px;padding-bottom:28px}
+.cover .eyebrow{color:#B8CADB}
+.cover h1{font:500 46px/1.05 var(--serif);letter-spacing:-.02em;margin:10px 0 8px}
+.cover .sub{font-size:17px;color:#D5DEE8;max-width:760px;margin:0}
+.meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0 0}
+.meta button{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:12px 16px 14px;text-align:left;color:#fff;cursor:pointer;min-width:0}
+.meta button:hover{background:rgba(255,255,255,.13)}
+.meta .k{display:block;font:500 12.5px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#B8CADB}
+.meta b{display:block;font:500 28px/1.15 var(--serif);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta .s{display:block;font-size:14px;color:#D5DEE8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* tabs */
+.tbar{position:sticky;top:0;z-index:15;background:var(--paper);border-bottom:1px solid var(--rule2)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:16px 12px 13px;font-size:15.5px;font-weight:600;color:var(--slate);cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--teal)}
+.tab .n{display:inline-block;min-width:24px;margin-left:6px;padding:0 7px;border-radius:10px;background:var(--mist);color:var(--ink);font-size:13px;font-weight:600;text-align:center}
+.tab.on .n{background:var(--teal-tint);color:var(--teal-t)}
+
+/* a tab */
+main{padding:22px 0 90px}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 4px}
+.head h2{font:500 32px/1.15 var(--serif);letter-spacing:-.01em;margin:0}
+.blurb{color:var(--slate);margin:0 0 14px;max-width:780px}
+.tools{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:0 0 14px}
+.tools input[type=search],.tools select{border:1.5px solid var(--line2);background:#fff;border-radius:10px;padding:7px 11px;font-size:15px}
+.tools input[type=search]{width:230px}
+.tools label.tg{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;color:var(--slate);cursor:pointer}
+.tools label.tg input{width:17px;height:17px;accent-color:var(--teal)}
+.tools .sp{flex:1 1 auto}
+.save{font:500 12.5px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.save.bad{color:var(--coral-t)}
+.empty{background:var(--card);border:1px dashed var(--rule2);border-radius:16px;padding:22px;color:var(--slate)}
+
+/* the sheet */
+.sheet-wrap{position:relative;overflow-x:auto;border:1px solid var(--rule);border-radius:14px;background:var(--card)}
+table.sheet{border-collapse:collapse;width:100%}
+.sheet th{background:var(--mist);text-align:left;font:500 12.5px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:0;border-bottom:1px solid var(--rule2);white-space:nowrap}
+.sheet th button{background:none;border:0;width:100%;text-align:left;padding:11px 10px;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer}
+.sheet th button:hover{color:var(--ink)}
+.sheet th .arr{color:var(--teal-t)}
+.sheet td{border-bottom:1px solid var(--rule);padding:3px 4px;vertical-align:top}
+.sheet tbody tr:last-child td{border-bottom:0}
+.cv{display:flex;align-items:center;gap:4px;min-width:0}
+.sheet input,.sheet select,.sheet textarea{width:100%;min-width:0;border:1.5px solid transparent;background:transparent;border-radius:8px;padding:6px 8px;font-size:15px;line-height:1.4}
+.sheet input:hover,.sheet select:hover,.sheet textarea:hover{border-color:var(--rule2)}
+.sheet input:focus,.sheet select:focus,.sheet textarea:focus{border-color:var(--teal);background:#fff;outline:none}
+.sheet textarea{resize:none;overflow:hidden;display:block;min-height:36px}
+.sheet input[type=checkbox]{width:20px;height:20px;accent-color:var(--teal);margin:8px;flex:none}
+.sheet .cur{color:var(--slate);padding-left:6px}
+.sheet .open{font-size:13.5px;font-weight:600;white-space:nowrap;padding:0 6px}
+.sheet td.rt{white-space:nowrap;text-align:right;vertical-align:middle;padding-right:8px}
+.edited{display:block;font:500 12px/1.3 var(--mono);color:var(--ink3);letter-spacing:.03em}
+.sheet tr.done td{background:#F7F4EE}
+.sheet tr.done input:not([type=checkbox]),.sheet tr.done textarea,.sheet tr.done select{color:var(--slate)}
+.sheet tr.fresh td{background:var(--teal-tint)}
+.sheet tr.arch td{background:var(--mist)}
+.sheet tr.arch .cv{opacity:.6}
+
+/* jobs */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+.chip{display:inline-flex;align-items:center;gap:8px;background:none;border:1.5px solid var(--line2);border-radius:999px;padding:5px 14px;font-size:15px;font-weight:600;cursor:pointer;color:var(--ink)}
+.chip .c{font:500 13px/1.4 var(--mono);color:var(--ink3)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip.on .c{color:var(--sky)}
+.job{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:14px 18px;margin:0 0 10px}
+.job h3{font:500 21px/1.25 var(--serif);margin:0 0 3px}
+.job h3 a{color:var(--ink);text-decoration:none}
+.job h3 a:hover{color:var(--teal-t);text-decoration:underline}
+.jm{color:var(--slate);font-size:14.5px;margin:0 0 10px}
+.jd{font-size:14.5px;color:var(--slate);margin:0 0 10px;max-height:6.3em;overflow:hidden}
+.pill{display:inline-block;font:500 12px/1.4 var(--mono);letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;color:var(--slate)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+
+/* undo toast */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
+.toast button{background:none;border:1.5px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font-weight:600;cursor:pointer}
+
+@media (max-width:860px){
+  .meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  .cover h1{font-size:34px}
+  .cover .sub{font-size:16px}
+  .meta b{font-size:22px}
+  .meta .k,.save,.pill,.chip .c{font-size:13px}
+  .mast-r .who{display:none}
+  .tools input[type=search]{width:100%}
+  .head h2{font-size:27px}
+  .sheet-wrap{overflow:visible;border:0;background:none}
+  table.sheet,.sheet tbody,.sheet tr,.sheet td{display:block;width:100%}
+  .sheet thead{display:none}
+  .sheet tr{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:8px 12px;margin:0 0 12px}
+  .sheet td{border:0;padding:2px 0;display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;align-items:center}
+  .sheet td::before{content:attr(data-label);font:500 13px/1.3 var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--ink3)}
+  .sheet td.rt{display:flex;justify-content:space-between;align-items:center;padding-top:6px;margin-top:4px;border-top:1px solid var(--rule)}
+  .sheet td.rt::before{content:none}
+  .sheet tr.done td,.sheet tr.fresh td,.sheet tr.arch td{background:none}
+  .sheet tr.done{background:#F7F4EE}
+  .sheet tr.fresh{background:var(--teal-tint)}
+  .sheet tr.arch{background:var(--mist)}
+  .edited{font-size:13px}
+  .sheet input,.sheet select,.sheet textarea{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+var SB_URL = 'https://ybfaykwwnirjwabmgsqu.supabase.co';
+var SB_KEY = 'sb_publishable__doHKn0KYVVPUnYqVdchnw_TBUq5eYy';
+// ?demo runs on made-up rows in memory, on localhost only, so the live site never shows them
+var DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]demo\b/.test(location.search);
+// default storage key on purpose: one sign-in covers this page and /jobs
+var sb = !DEMO && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+
+var AREAS = ['West Linn', 'Sherwood', 'Mount Tabor area', 'Grant High area', 'Sellwood-Moreland', 'SW Washington', 'Other'];
+var PEOPLE = ['Jeffrey', 'Paige', 'Both'];
+
+// Each sheet tab is rows in move_rows with tab = key. Column types: text, long,
+// date, num, money, select (opts), check, url, who, suggest (sugg = suggestions).
+var TABS = [
+  {key: 'timeline', label: 'Timeline', add: 'Add a date', tasks: true,
+   blurb: 'Dates and milestones for the move, in order.',
+   sort: {k: 'date', dir: 1},
+   cols: [
+     {k: 'date', l: 'Date', t: 'date', w: 150},
+     {k: 'what', l: 'What', t: 'long', w: 320},
+     {k: 'who', l: 'Who', t: 'who', w: 130},
+     {k: 'done', l: 'Done', t: 'check', w: 70},
+     {k: 'notes', l: 'Notes', t: 'long', w: 300}]},
+  {key: 'schools', label: 'Schools', add: 'Add a school',
+   blurb: 'Schools to look at. For a rental, check which schools the address is assigned to with the district’s own school finder.',
+   sort: {k: 'area', dir: 1}, defaults: {status: 'To look at'},
+   cols: [
+     {k: 'school', l: 'School', t: 'text', w: 220},
+     {k: 'level', l: 'Level', t: 'select', opts: ['Elementary', 'Middle', 'High', 'Other'], w: 120},
+     {k: 'district', l: 'District', t: 'suggest', sugg: ['West Linn-Wilsonville School District', 'Sherwood School District', 'Portland Public Schools'], w: 230},
+     {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
+     {k: 'status', l: 'Status', t: 'select', opts: ['To look at', 'Visited', 'Like', 'Top pick', 'No'], w: 130},
+     {k: 'link', l: 'Link', t: 'url', w: 190},
+     {k: 'notes', l: 'Notes', t: 'long', w: 280}]},
+  {key: 'rentals', label: 'Rentals', add: 'Add a rental',
+   blurb: 'Paste a listing link, fill in what matters, and move it along as you go.',
+   sort: {k: 'status', dir: 1}, defaults: {status: 'New'},
+   cols: [
+     {k: 'address', l: 'Address', t: 'text', w: 210},
+     {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
+     {k: 'hood', l: 'Neighborhood', t: 'suggest', sugg: ['Willamette', 'Tanner Basin', 'Rosemont', 'Robinwood'], w: 150},
+     {k: 'rent', l: 'Rent / mo', t: 'money', w: 120},
+     {k: 'beds', l: 'Beds', t: 'num', w: 80},
+     {k: 'baths', l: 'Baths', t: 'num', w: 80},
+     {k: 'available', l: 'Available', t: 'date', w: 150},
+     {k: 'schools', l: 'Assigned schools', t: 'text', w: 200},
+     {k: 'status', l: 'Status', t: 'select', opts: ['New', 'Like', 'Contacted', 'Toured', 'Applied', 'Passed'], w: 130},
+     {k: 'link', l: 'Link', t: 'url', w: 190},
+     {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
+  {key: 'house', label: 'Selling the house', add: 'Add a task', tasks: true,
+   blurb: 'Everything it takes to sell the Tucson house.',
+   sort: {k: 'due', dir: 1},
+   cols: [
+     {k: 'task', l: 'Task', t: 'long', w: 300},
+     {k: 'category', l: 'Category', t: 'suggest', sugg: ['Repairs', 'Agent', 'Paperwork', 'Staging', 'Moving out'], w: 150},
+     {k: 'who', l: 'Who', t: 'who', w: 130},
+     {k: 'due', l: 'Due', t: 'date', w: 150},
+     {k: 'done', l: 'Done', t: 'check', w: 70},
+     {k: 'cost', l: 'Cost', t: 'money', w: 110},
+     {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
+  {key: 'logistics', label: 'Moving logistics', add: 'Add a task', tasks: true,
+   blurb: 'Movers, packing, utilities, address changes, cars and the rest.',
+   sort: {k: 'due', dir: 1},
+   cols: [
+     {k: 'task', l: 'Task', t: 'long', w: 300},
+     {k: 'category', l: 'Category', t: 'suggest', sugg: ['Movers', 'Packing', 'Utilities', 'Address change', 'Cars and licenses', 'School enrollment', 'Travel', 'Other'], w: 170},
+     {k: 'who', l: 'Who', t: 'who', w: 130},
+     {k: 'due', l: 'Due', t: 'date', w: 150},
+     {k: 'done', l: 'Done', t: 'check', w: 70},
+     {k: 'cost', l: 'Cost', t: 'money', w: 110},
+     {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
+  {key: 'notes', label: 'Notes', add: 'Add a note',
+   blurb: 'Anything else, for both of you.',
+   sort: {k: '_updated', dir: -1},
+   cols: [
+     {k: 'title', l: 'Title', t: 'text', w: 240},
+     {k: 'body', l: 'Note', t: 'long', w: 600}]},
+  {key: 'jobs', label: 'Jobs', jobs: true}
+];
+var TAB = {};
+TABS.forEach(function(t){ TAB[t.key] = t; });
+
+var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '',
+         hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
+         loadedAt: 0, saving: 0, saveErr: ''};
+
+function $(sel, el){ return (el || document).querySelector(sel); }
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
+}
+function safeUrl(u){ u = String(u || '').trim(); return /^https?:\/\/\S+$/i.test(u) ? u : ''; }
+// first names for the "edited by" line, matched on the start of the address so
+// no full address sits in this page's code
+var NAMES = [['jeffrey', 'Jeffrey'], ['paige', 'Paige']];
+function whoOf(email){
+  var local = String(email || '').split('@')[0].toLowerCase();
+  for (var i = 0; i < NAMES.length; i++) if (local.indexOf(NAMES[i][0]) === 0) return NAMES[i][1];
+  return local;
+}
+function day(iso){
+  if (!iso) return '';
+  var d = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'});
+}
+function today(){ var d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function must(r){ if (r.error) throw r.error; return r.data; }
+
+/* ---------- data ---------- */
+
+var api = DEMO ? demoApi() : {
+  session: async function(){ var r = await sb.auth.getSession(); return r.data && r.data.session ? r.data.session.user : null; },
+  signIn: async function(email, pass){ var r = await sb.auth.signInWithPassword({email: email, password: pass}); if (r.error) throw r.error; return r.data.user; },
+  signOut: function(){ return sb.auth.signOut(); },
+  isEditor: async function(){ return must(await sb.from('move_editors').select('email')).length > 0; },
+  rows: async function(){ return must(await sb.from('move_rows').select('*').order('created_at', {ascending: true}).limit(5000)); },
+  row: async function(id){ return must(await sb.from('move_rows').select('*').eq('id', id).single()); },
+  add: async function(tab, me, data){ return must(await sb.from('move_rows').insert({tab: tab, data: data || {}, created_by: me, updated_by: me}).select().single()); },
+  version: async function(row, me){ must(await sb.from('move_versions').insert({row_id: row.id, data: row.data, archived: row.archived, saved_by: me})); },
+  update: async function(id, body){ return must(await sb.from('move_rows').update(body).eq('id', id).select().single()); },
+  jobs: async function(statuses, limit){
+    return must(await sb.from('jobs').select('id,employer_name,title,location,salary_min,salary_max,salary_raw,status,canonical_url,first_seen')
+      .in('status', statuses).order('first_seen', {ascending: false}).limit(limit));
+  },
+  jobCount: async function(statuses){
+    var r = await sb.from('jobs').select('id', {count: 'exact', head: true}).in('status', statuses);
+    if (r.error) throw r.error; return r.count || 0;
+  },
+  setJob: async function(id, status){ must(await sb.from('jobs').update({status: status}).eq('id', id)); },
+  opps: async function(){
+    return must(await sb.from('opportunities').select('id,kind,title,org,location,url,deadline,status,description')
+      .in('status', ['new', 'watch', 'pursue']).order('deadline', {ascending: true, nullsFirst: false}).limit(200));
+  },
+  oppCount: async function(){
+    var r = await sb.from('opportunities').select('id', {count: 'exact', head: true}).in('status', ['new', 'watch', 'pursue']);
+    if (r.error) throw r.error; return r.count || 0;
+  },
+  setOpp: async function(id, status){ must(await sb.from('opportunities').update({status: status, updated_at: new Date().toISOString()}).eq('id', id)); }
+};
+
+function demoApi(){
+  var me = 'demo@localhost', now = Date.now(), n = 0;
+  function iso(h){ return new Date(now - h * 3600000).toISOString(); }
+  function mk(tab, data, h){ n++; return {id: 'demo-' + n, tab: tab, data: data, archived: false, source: 'page', ext_id: null, created_by: me, updated_by: me, created_at: iso(h), updated_at: iso(h)}; }
+  var rows = [
+    mk('timeline', {date: '2027-06-01', what: 'Example: move window opens', who: 'Both'}, 50),
+    mk('timeline', {date: '2026-11-15', what: 'Example: settle the rent budget', who: 'Jeffrey', done: true}, 49),
+    mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at'}, 40),
+    mk('rentals', {address: '123 Example St', area: 'West Linn', hood: 'Willamette', rent: 2800, beds: 3, baths: 2, status: 'Like', link: 'https://example.com/listing'}, 30),
+    mk('rentals', {address: '456 Sample Ave', area: 'Sellwood-Moreland', rent: 2550, beds: 2, baths: 1, status: 'New'}, 29),
+    mk('house', {task: 'Example: interview listing agents', category: 'Agent', who: 'Both', due: '2027-02-01'}, 20),
+    mk('logistics', {task: 'Example: get three mover quotes', category: 'Movers', who: 'Jeffrey', due: '2027-04-15'}, 10),
+    mk('notes', {title: 'Example note', body: 'Demo text. Nothing here is saved.'}, 5)
+  ];
+  var jobs = [
+    {id: 1, employer_name: 'Example County', title: 'Example Policy Analyst', location: 'Vancouver, WA', salary_min: 85000, salary_max: 110000, status: 'queued', canonical_url: 'https://example.com/job/1', first_seen: iso(3)},
+    {id: 2, employer_name: 'Example Foundation', title: 'Example Program Evaluation Manager', location: 'Remote', salary_raw: '$95,000 - $120,000 Annually', status: 'queued', canonical_url: 'https://example.com/job/2', first_seen: iso(8)},
+    {id: 3, employer_name: 'Example City', title: 'Example Research Analyst', location: 'Portland, OR', status: 'applied', canonical_url: 'https://example.com/job/3', first_seen: iso(90)}
+  ];
+  var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', description: 'Demo opportunity.'}];
+  function copy(v){ return new Promise(function(res){ setTimeout(function(){ res(JSON.parse(JSON.stringify(v))); }, 120); }); }
+  function find(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
+  return {
+    session: async function(){ return {email: me}; },
+    signIn: async function(){ return {email: me}; },
+    signOut: async function(){},
+    isEditor: async function(){ return true; },
+    rows: async function(){ return copy(rows); },
+    row: async function(id){ return copy(find(id)); },
+    add: async function(tab, who, data){ var r = mk(tab, data || {}, 0); r.created_at = r.updated_at = new Date().toISOString(); rows.push(r); return copy(r); },
+    version: async function(){},
+    update: async function(id, body){ var r = find(id); Object.assign(r, JSON.parse(JSON.stringify(body)), {updated_at: new Date().toISOString()}); return copy(r); },
+    jobs: async function(st){ return copy(jobs.filter(function(j){ return st.indexOf(j.status) >= 0; })); },
+    jobCount: async function(st){ return jobs.filter(function(j){ return st.indexOf(j.status) >= 0; }).length; },
+    setJob: async function(id, s){ jobs.filter(function(j){ return j.id === id; })[0].status = s; },
+    opps: async function(){ return copy(opps.filter(function(o){ return ['new', 'watch', 'pursue'].indexOf(o.status) >= 0; })); },
+    oppCount: async function(){ return opps.filter(function(o){ return ['new', 'watch', 'pursue'].indexOf(o.status) >= 0; }).length; },
+    setOpp: async function(id, s){ opps.filter(function(o){ return o.id === id; })[0].status = s; }
+  };
+}
+
+/* ---------- sign in and notices ---------- */
+
+function gate(html){ $('#root').innerHTML = '<div class="gate"><div class="gate-card">' + html + '</div></div>'; }
+
+function signInView(msg){
+  gate('<p class="eyebrow">Private</p><h1>Portland move</h1><p>Sign in to see the board.</p>' +
+    (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
+    '<form id="signin"><label class="fld"><span>Email</span><input type="email" id="email" autocomplete="username" required></label>' +
+    '<label class="fld"><span>Password</span><input type="password" id="pass" autocomplete="current-password" required></label>' +
+    '<button class="btn primary" type="submit">Sign in</button></form>');
+  $('#signin').onsubmit = async function(e){
+    e.preventDefault();
+    var b = this.querySelector('button'); b.disabled = true;
+    try { S.user = await api.signIn($('#email').value.trim(), $('#pass').value); boot(); }
+    catch (err){ signInView(err.message || 'Sign-in failed.'); }
+  };
+}
+
+async function boot(){
+  if (!DEMO && !sb){ gate('<p class="eyebrow">Portland move</p><h1>Can’t load</h1><p>The sign-in code didn’t load. Check the connection and reload the page.</p>'); return; }
+  try { S.user = await api.session(); } catch (e){ S.user = null; }
+  if (!S.user){ signInView(); return; }
+  try {
+    if (!(await api.isEditor())){
+      gate('<p class="eyebrow">Portland move</p><h1>Not on the list</h1><p>You’re signed in as ' + esc(S.user.email) +
+        ', but this address isn’t on the board’s list yet. Jeffrey adds it in Supabase.</p><button class="btn quiet" data-act="signout">Sign out</button>');
+      return;
+    }
+    S.rows = await api.rows();
+    S.loadedAt = Date.now();
+  } catch (e){
+    if (e && (e.code === 'PGRST205' || e.code === '42P01')){
+      gate('<p class="eyebrow">Almost there</p><h1>Portland move</h1><p>You’re signed in, but the board’s tables aren’t in the database yet. Run the setup SQL in Supabase, then reload this page.</p><button class="btn quiet" data-act="signout">Sign out</button>');
+      return;
+    }
+    gate('<p class="eyebrow">Portland move</p><h1>Something went wrong</h1><div class="err">' + esc(e.message || e) + '</div><button class="btn quiet" data-act="signout">Sign out</button>');
+    return;
+  }
+  renderApp();
+  loadJobCounts();
+}
+
+/* ---------- the board ---------- */
+
+function renderApp(){
+  var h = location.hash.slice(1);
+  if (TAB[h]) S.tab = h;
+  $('#root').innerHTML =
+    (DEMO ? '<div class="demo">Demo data on this computer only. Nothing is saved.</div>' : '') +
+    '<header class="mast"><div class="wrap"><span class="brand">Portland move</span><div class="mast-r"><span class="who">' + esc(S.user.email) +
+    '</span><button class="btn-w" data-act="signout">Sign out</button></div></div></header>' +
+    '<section class="cover"><div class="wrap"><p class="eyebrow">Portland area · renting first</p><h1>Our move board</h1>' +
+    '<p class="sub">The timeline, schools, rentals, selling the Tucson house and moving logistics in one place, with the job search alongside.</p>' +
+    '<div class="meta" id="meta"></div></div></section>' +
+    '<nav class="tbar" aria-label="Board"><div class="wrap"><div class="tabs" role="tablist" id="tabs"></div></div></nav>' +
+    '<main><div class="wrap" id="view"></div></main>';
+  drawMeta(); drawTabs(); drawView();
+}
+
+function live(tab){ return S.rows.filter(function(r){ return r.tab === tab && !r.archived; }); }
+
+function drawMeta(){
+  var el = $('#meta'); if (!el) return;
+  var t = today();
+  var tl = live('timeline').filter(function(r){ return !r.data.done; })
+    .sort(function(a, b){ return (a.data.date || '9999') < (b.data.date || '9999') ? -1 : 1; });
+  var next = tl.filter(function(r){ return r.data.date && r.data.date >= t; })[0] || tl[0];
+  var house = live('house').filter(function(r){ return !r.data.done; }).length;
+  var logi = live('logistics').filter(function(r){ return !r.data.done; }).length;
+  var liked = live('rentals').filter(function(r){ return ['Like', 'Contacted', 'Toured', 'Applied'].indexOf(r.data.status) >= 0; }).length;
+  var q = S.jobCounts ? S.jobCounts.queued : null;
+  el.innerHTML =
+    '<button data-go="timeline"><span class="k">Next on the timeline</span><b>' + esc(next ? (day(next.data.date) || 'No date') : 'Nothing yet') + '</b><span class="s">' + esc(next ? (next.data.what || '') : 'Add the first date') + '</span></button>' +
+    '<button data-go="' + (house || !logi ? 'house' : 'logistics') + '"><span class="k">Open to-dos</span><b>' + (house + logi) + '</b><span class="s">' + house + ' house · ' + logi + ' logistics</span></button>' +
+    '<button data-go="rentals"><span class="k">Rentals you like</span><b>' + liked + '</b><span class="s">' + live('rentals').length + ' saved in all</span></button>' +
+    '<button data-go="jobs"><span class="k">Jobs in the queue</span><b>' + (q == null ? '…' : q) + '</b><span class="s">From the job scan</span></button>';
+}
+
+function tabCount(t){
+  if (t.jobs) return S.jobCounts ? S.jobCounts.queued : '';
+  var rows = live(t.key);
+  if (t.tasks) rows = rows.filter(function(r){ return !r.data.done; });
+  return rows.length;
+}
+
+function drawTabs(){
+  var el = $('#tabs'); if (!el) return;
+  el.innerHTML = TABS.map(function(t){
+    var on = t.key === S.tab, n = tabCount(t);
+    return '<button class="tab' + (on ? ' on' : '') + '" role="tab" aria-selected="' + on + '" data-tab="' + t.key + '">' + esc(t.label) +
+      (n !== '' ? '<span class="n">' + n + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+function goTab(key){
+  if (!TAB[key]) return;
+  S.tab = key; S.q = ''; S.fresh = {};
+  history.replaceState(null, '', '#' + key);
+  drawTabs(); drawView();
+  var bar = $('.tbar');
+  if (bar && bar.getBoundingClientRect().top < 0) window.scrollTo({top: bar.offsetTop, behavior: 'smooth'});
+}
+
+function drawView(){ if (TAB[S.tab].jobs) drawJobs(); else drawSheetView(); }
+
+function hasCol(t, k){ return t.cols.some(function(c){ return c.k === k; }); }
+function colOf(t, k){ return t.cols.filter(function(c){ return c.k === k; })[0]; }
+
+function drawSheetView(){
+  var t = TAB[S.tab];
+  $('#view').innerHTML =
+    '<div class="head"><h2>' + esc(t.label) + '</h2><span class="save" id="save" role="status"></span></div>' +
+    '<p class="blurb">' + esc(t.blurb) + '</p>' +
+    '<div class="tools"><input type="search" id="q" placeholder="Search this tab" aria-label="Search this tab" value="' + esc(S.q) + '">' +
+    (hasCol(t, 'area') ? '<select id="area" aria-label="Area"><option value="">All areas</option>' +
+      AREAS.map(function(a){ return '<option' + (a === S.area ? ' selected' : '') + '>' + esc(a) + '</option>'; }).join('') + '</select>' : '') +
+    (t.tasks ? '<label class="tg"><input type="checkbox" id="hideDone"' + (S.hideDone ? ' checked' : '') + '> Hide done</label>' : '') +
+    '<label class="tg"><input type="checkbox" id="showArch"' + (S.showArch ? ' checked' : '') + '> Show archived</label>' +
+    '<span class="sp"></span><button class="btn quiet small" data-act="csv">Download CSV</button>' +
+    '<button class="btn primary small" data-act="add">+ ' + esc(t.add) + '</button></div>' +
+    '<div id="sheet"></div><div id="dls"></div>';
+  drawSave(); drawSheet();
+}
+
+function visibleRows(t){
+  var q = S.q.trim().toLowerCase(), area = hasCol(t, 'area') ? S.area : '';
+  var rows = S.rows.filter(function(r){
+    if (r.tab !== t.key) return false;
+    if (S.fresh[r.id]) return true;
+    if (r.archived && !S.showArch) return false;
+    if (t.tasks && S.hideDone && r.data.done) return false;
+    if (area && r.data.area !== area) return false;
+    if (q){
+      var hay = Object.keys(r.data).map(function(k){ return r.data[k]; }).join(' ').toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+  var s = S.sort[t.key] || t.sort, col = colOf(t, s.k);
+  rows.sort(function(a, b){
+    var fa = S.fresh[a.id] || 0, fb = S.fresh[b.id] || 0;
+    if (fa || fb) return fb - fa;
+    if (a.archived !== b.archived) return a.archived ? 1 : -1;
+    if (t.tasks){ var da = a.data.done ? 1 : 0, db = b.data.done ? 1 : 0; if (da !== db) return da - db; }
+    return cmp(col, s.k, s.dir, a, b) || (a.created_at < b.created_at ? -1 : 1);
+  });
+  return rows;
+}
+
+// empty cells sort last whichever way the column is sorted
+function cmp(col, k, dir, a, b){
+  var va = k === '_updated' ? a.updated_at : a.data[k], vb = k === '_updated' ? b.updated_at : b.data[k];
+  var t = col ? col.t : 'text';
+  if (t !== 'check'){
+    var ea = va == null || va === '', eb = vb == null || vb === '';
+    if (ea || eb) return ea === eb ? 0 : (ea ? 1 : -1);
+  }
+  var r;
+  if (t === 'select') r = col.opts.indexOf(va) - col.opts.indexOf(vb);
+  else if (t === 'num' || t === 'money') r = Number(va) - Number(vb);
+  else if (t === 'check') r = (va ? 1 : 0) - (vb ? 1 : 0);
+  else r = String(va).localeCompare(String(vb), undefined, {numeric: true, sensitivity: 'base'});
+  return r * dir;
+}
+
+function drawSheet(){
+  var t = TAB[S.tab], box = $('#sheet'); if (!box) return;
+  var rows = visibleRows(t), any = S.rows.some(function(r){ return r.tab === t.key; });
+  var s = S.sort[t.key] || t.sort;
+  var h;
+  if (!rows.length){
+    h = '<div class="empty">' + (any ? 'Nothing matches. Clear the search or filters to see every row.' : 'Nothing here yet. Add the first row below.') + '</div>';
+  } else {
+    h = '<div class="sheet-wrap"><table class="sheet"><thead><tr>' + t.cols.map(function(c){
+      var on = s.k === c.k;
+      return '<th style="min-width:' + (c.w || 120) + 'px" aria-sort="' + (on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + c.k + '">' +
+        esc(c.l) + (on ? ' <span class="arr">' + (s.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</button></th>';
+    }).join('') + '<th><span class="sr">Row</span></th></tr></thead><tbody>' +
+      rows.map(function(r){ return rowHtml(t, r); }).join('') + '</tbody></table></div>';
+  }
+  h += '<button class="addrow" data-act="add">+ ' + esc(t.add) + '</button>';
+  box.innerHTML = h;
+  drawLists(t);
+  box.querySelectorAll('textarea').forEach(grow);
+}
+
+function rowHtml(t, r){
+  var cls = [r.data.done ? 'done' : '', r.archived ? 'arch' : '', S.fresh[r.id] ? 'fresh' : ''].join(' ').trim();
+  return '<tr data-id="' + esc(r.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
+    t.cols.map(function(c){ return cell(t, c, r.data[c.k]); }).join('') +
+    '<td class="rt"><span class="edited">' + esc(edited(r)) + '</span>' +
+    (r.archived ? '<button class="mini" data-act="restore">Restore</button>'
+                : '<button class="mini warn" data-act="archive" aria-label="Archive this row">Archive</button>') +
+    '</td></tr>';
+}
+
+function edited(r){ return r.updated_by ? whoOf(r.updated_by) + ', ' + day(r.updated_at) : ''; }
+
+function cell(t, c, v){
+  var a = ' data-k="' + c.k + '" aria-label="' + esc(c.l) + '"', inner;
+  if (v == null) v = '';
+  switch (c.t){
+    case 'check': inner = '<input type="checkbox"' + a + (v ? ' checked' : '') + '>'; break;
+    case 'select':
+      inner = '<select' + a + '><option value=""></option>' + c.opts.map(function(o){
+        return '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>';
+      }).join('') + (v && c.opts.indexOf(v) < 0 ? '<option selected>' + esc(v) + '</option>' : '') + '</select>';
+      break;
+    case 'date': inner = '<input type="date"' + a + ' value="' + esc(v) + '">'; break;
+    case 'num': inner = '<input type="number" inputmode="decimal" step="any"' + a + ' value="' + esc(v) + '">'; break;
+    case 'money': inner = '<span class="cur">$</span><input type="number" inputmode="decimal" step="any"' + a + ' value="' + esc(v) + '">'; break;
+    case 'long': inner = '<textarea rows="1"' + a + '>' + esc(v) + '</textarea>'; break;
+    case 'url': inner = '<input type="url" placeholder="https://"' + a + ' value="' + esc(v) + '">' + openLink(v); break;
+    case 'who': inner = '<input type="text" list="dl-who"' + a + ' value="' + esc(v) + '">'; break;
+    case 'suggest': inner = '<input type="text" list="dl-' + t.key + '-' + c.k + '"' + a + ' value="' + esc(v) + '">'; break;
+    default: inner = '<input type="text"' + a + ' value="' + esc(v) + '">';
+  }
+  return '<td data-label="' + esc(c.l) + '"><div class="cv">' + inner + '</div></td>';
+}
+
+function openLink(v){ var u = safeUrl(v); return u ? '<a class="open" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open</a>' : ''; }
+
+function drawLists(t){
+  var seen = {}, out = [];
+  function list(id, base, key, tabKey){
+    var vals = base.slice();
+    S.rows.forEach(function(r){
+      if (tabKey && r.tab !== tabKey) return;
+      var v = r.data[key];
+      if (v && typeof v === 'string' && vals.indexOf(v) < 0) vals.push(v);
+    });
+    out.push('<datalist id="' + id + '">' + vals.map(function(v){ return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>');
+  }
+  if (t.cols.some(function(c){ return c.t === 'who'; })) list('dl-who', PEOPLE, 'who', null);
+  t.cols.forEach(function(c){
+    if (c.t === 'suggest' && !seen[c.k]){ seen[c.k] = 1; list('dl-' + t.key + '-' + c.k, c.sugg || [], c.k, t.key); }
+  });
+  $('#dls').innerHTML = out.join('');
+}
+
+function grow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 3) + 'px'; }
+
+/* ---------- saving ---------- */
+
+function drawSave(){
+  var el = $('#save'); if (!el) return;
+  el.className = 'save' + (S.saveErr ? ' bad' : '');
+  el.textContent = S.saveErr ? 'Not saved: ' + S.saveErr : S.saving ? 'Saving…' : 'All changes saved';
+}
+
+// Read the row fresh, keep the earlier version, then change only what was edited,
+// so two people editing different cells of the same row don't undo each other.
+// Saves to one row run one after another, so tabbing quickly through its cells
+// can't make a later save start from a copy read before an earlier one landed.
+var rowQueue = {};
+function mutate(id, change){
+  var run = function(){ return mutateNow(id, change); };
+  var p = (rowQueue[id] || Promise.resolve()).then(run, run);
+  rowQueue[id] = p.catch(function(){});
+  return p;
+}
+
+async function mutateNow(id, change){
+  S.saving++; S.saveErr = ''; drawSave();
+  try {
+    var cur = await api.row(id);
+    await api.version(cur, S.user.email);
+    var body = change(cur);
+    body.updated_by = S.user.email;
+    var row = await api.update(id, body);
+    for (var i = 0; i < S.rows.length; i++) if (S.rows[i].id === id) S.rows[i] = row;
+    return row;
+  } catch (e){
+    S.saveErr = (e && e.message) || 'check the connection and try again';
+    throw e;
+  } finally {
+    S.saving--; drawSave();
+  }
+}
+
+async function saveCell(id, k, v){
+  var row = await mutate(id, function(cur){
+    var d = Object.assign({}, cur.data);
+    if (v === '' || v === false || v == null) delete d[k]; else d[k] = v;
+    return {data: d};
+  });
+  var tr = document.querySelector('tr[data-id="' + CSS.escape(id) + '"]');
+  if (tr){ var ed = $('.edited', tr); if (ed) ed.textContent = edited(row); }
+  drawMeta(); drawTabs();
+}
+
+async function addRow(){
+  var t = TAB[S.tab], data = Object.assign({}, t.defaults || {});
+  if (S.area && hasCol(t, 'area')) data.area = S.area;
+  try {
+    S.saving++; S.saveErr = ''; drawSave();
+    var r = await api.add(t.key, S.user.email, data);
+    S.rows.push(r); S.fresh[r.id] = Date.now();
+  } catch (e){
+    S.saveErr = (e && e.message) || 'could not add a row'; return;
+  } finally { S.saving--; drawSave(); }
+  drawSheet(); drawTabs(); drawMeta();
+  // the cursor goes to the row's first written field (What, Address, Task), not a date picker
+  var tr = document.querySelector('tr[data-id="' + CSS.escape(r.id) + '"]');
+  var first = tr && tr.querySelector('textarea, input[type=text], input[type=url]');
+  if (first) first.focus();
+}
+
+async function setArchived(id, flag){
+  try { await mutate(id, function(){ return {archived: flag}; }); } catch (e){ return; }
+  delete S.fresh[id];
+  drawSheet(); drawTabs(); drawMeta();
+  if (flag) toast('Row archived.', function(){ setArchived(id, false); });
+}
+
+/* ---------- CSV ---------- */
+
+function downloadCsv(){
+  var t = TAB[S.tab], rows = visibleRows(t);
+  function q(v){ v = v == null ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  var lines = [t.cols.map(function(c){ return c.l; }).concat(['Last edited by', 'Last edited'])];
+  rows.forEach(function(r){
+    lines.push(t.cols.map(function(c){ var v = r.data[c.k]; return c.t === 'check' ? (v ? 'yes' : '') : v; })
+      .concat([whoOf(r.updated_by), (r.updated_at || '').slice(0, 10)]));
+  });
+  var blob = new Blob(['﻿' + lines.map(function(l){ return l.map(q).join(','); }).join('\r\n')], {type: 'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'portland-move-' + t.key + '-' + today() + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+/* ---------- jobs ---------- */
+
+async function loadJobCounts(){
+  try {
+    var c = await Promise.all([api.jobCount(['queued']), api.jobCount(['applied', 'user_rejected']), api.oppCount()]);
+    S.jobCounts = {queued: c[0], decided: c[1], opps: c[2]};
+  } catch (e){ S.jobCounts = null; }
+  drawMeta(); drawTabs(); drawJobChips();
+}
+
+function drawJobs(){
+  $('#view').innerHTML = '<div class="head"><h2>Jobs</h2></div>' +
+    '<p class="blurb">The job scan’s queue. Applied or Pass moves a job to Decided. Opportunities are grants and other leads.</p>' +
+    '<div class="chips" id="jchips"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
+  drawJobChips(); loadJobList();
+}
+
+function drawJobChips(){
+  var el = $('#jchips'); if (!el) return;
+  var c = S.jobCounts || {};
+  el.innerHTML = [['queued', 'Queued', c.queued], ['decided', 'Decided', c.decided], ['opps', 'Opportunities', c.opps]].map(function(x){
+    return '<button class="chip' + (S.jobsView === x[0] ? ' on' : '') + '" data-jview="' + x[0] + '">' + x[1] +
+      (x[2] != null ? '<span class="c">' + x[2] + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+async function loadJobList(){
+  var view = S.jobsView, el = $('#jlist');
+  try {
+    var list = view === 'opps' ? await api.opps()
+      : await api.jobs(view === 'queued' ? ['queued'] : ['applied', 'user_rejected'], view === 'queued' ? 200 : 100);
+    if (S.tab !== 'jobs' || S.jobsView !== view || !$('#jlist')) return;
+    el = $('#jlist');
+    if (!list.length){ el.innerHTML = '<div class="empty">' + (view === 'queued' ? 'The queue is empty. Run jobscan to look for new postings.' : 'Nothing here.') + '</div>'; return; }
+    el.innerHTML = list.map(view === 'opps' ? oppCard : jobCard).join('');
+  } catch (e){
+    if ($('#jlist')) $('#jlist').innerHTML = '<div class="err">Could not load the jobs: ' + esc(e.message || e) + '</div>';
+  }
+}
+
+function fmtSalary(j){
+  if (j.salary_min && j.salary_max) return '$' + Math.round(j.salary_min / 1000) + 'K-$' + Math.round(j.salary_max / 1000) + 'K';
+  return j.salary_raw ? String(j.salary_raw).slice(0, 50) : '';
+}
+
+function jobCard(j){
+  var u = safeUrl(j.canonical_url);
+  var meta = [j.employer_name, j.location || 'location unlisted', fmtSalary(j)].filter(Boolean).map(esc).join(' · ');
+  var pill = j.status === 'applied' ? '<span class="pill">Applied</span> ' : j.status === 'user_rejected' ? '<span class="pill">Passed</span> ' : '';
+  var acts = j.status === 'queued'
+    ? '<button class="btn small primary" data-job="applied" data-id="' + j.id + '">Applied</button><button class="btn small quiet" data-job="user_rejected" data-id="' + j.id + '">Pass</button>'
+    : '<button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button>';
+  return '<article class="job" data-card="' + j.id + '" data-status="' + esc(j.status) + '"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) +
+    '</h3><p class="jm">' + pill + meta + '</p><div class="acts">' + acts + '</div></article>';
+}
+
+function oppCard(o){
+  var u = safeUrl(o.url);
+  var meta = [o.org, o.location, o.deadline ? 'due ' + day(o.deadline) : 'rolling'].filter(Boolean).map(esc).join(' · ');
+  return '<article class="job" data-card="' + o.id + '"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(o.title) + '</a>' : esc(o.title)) +
+    '</h3><p class="jm"><span class="pill">' + esc(o.kind) + '</span> <span class="pill">' + esc(o.status) + '</span> ' + meta + '</p>' +
+    (o.description ? '<p class="jd">' + esc(o.description) + '</p>' : '') +
+    '<div class="acts"><button class="btn small quiet" data-opp="watch" data-id="' + o.id + '">Watch</button>' +
+    '<button class="btn small primary" data-opp="pursue" data-id="' + o.id + '">Pursue</button>' +
+    '<button class="btn small quiet" data-opp="dismissed" data-id="' + o.id + '">Dismiss</button></div></article>';
+}
+
+async function jobAction(id, status, prev){
+  try { await api.setJob(id, status); } catch (e){ toast('Could not save: ' + (e.message || e)); return; }
+  var card = document.querySelector('[data-card="' + id + '"]'); if (card) card.remove();
+  var words = {applied: 'Marked applied.', user_rejected: 'Passed.', queued: 'Back in the queue.'};
+  toast(words[status] || 'Saved.', prev ? function(){ jobAction(id, prev, null).then(loadJobList); } : null);
+  loadJobCounts();
+}
+
+async function oppAction(id, status){
+  try { await api.setOpp(id, status); } catch (e){ toast('Could not save: ' + (e.message || e)); return; }
+  if (status === 'dismissed'){ var card = document.querySelector('[data-card="' + id + '"]'); if (card) card.remove(); }
+  else loadJobList();
+  toast(status === 'dismissed' ? 'Dismissed.' : 'Saved.');
+  loadJobCounts();
+}
+
+/* ---------- small things ---------- */
+
+var toastTimer;
+function toast(msg, undo){
+  var el = $('#toast');
+  if (!el){ el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button type="button">Undo</button>' : '');
+  if (undo) el.querySelector('button').onclick = function(){ el.remove(); undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ if (el.parentNode) el.remove(); }, 7000);
+}
+
+var qTimer;
+document.addEventListener('click', async function(e){
+  var b = e.target.closest('button, [data-act]'); if (!b) return;
+  if (b.dataset.tab){ goTab(b.dataset.tab); return; }
+  if (b.dataset.go){ goTab(b.dataset.go); return; }
+  if (b.dataset.sort){
+    var t = TAB[S.tab], s = S.sort[t.key] || t.sort;
+    S.sort[t.key] = {k: b.dataset.sort, dir: s.k === b.dataset.sort ? -s.dir : 1};
+    drawSheet(); return;
+  }
+  if (b.dataset.jview){ S.jobsView = b.dataset.jview; drawJobChips(); $('#jlist').innerHTML = '<p class="blurb">Loading…</p>'; loadJobList(); return; }
+  if (b.dataset.job){
+    var card = b.closest('[data-card]');
+    b.disabled = true;
+    jobAction(Number(b.dataset.id), b.dataset.job, card ? card.dataset.status : null); return;
+  }
+  if (b.dataset.opp){ b.disabled = true; oppAction(Number(b.dataset.id), b.dataset.opp); return; }
+  var act = b.dataset.act; if (!act) return;
+  if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
+  if (act === 'add'){ addRow(); return; }
+  if (act === 'csv'){ downloadCsv(); return; }
+  var tr = b.closest('tr[data-id]');
+  if (tr && act === 'archive'){ setArchived(tr.dataset.id, true); return; }
+  if (tr && act === 'restore'){ setArchived(tr.dataset.id, false); return; }
+});
+
+document.addEventListener('change', function(e){
+  var el = e.target;
+  if (el.id === 'area'){ S.area = el.value; drawSheet(); return; }
+  if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
+  if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
+  var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id]');
+  if (!k || !tr) return;
+  var c = colOf(TAB[S.tab], k), v;
+  if (el.type === 'checkbox') v = el.checked;
+  else if (c.t === 'num' || c.t === 'money') v = el.value === '' ? '' : (isNaN(Number(el.value)) ? el.value : Number(el.value));
+  else if (c.t === 'long') v = el.value.replace(/\s+$/, '');
+  else v = el.value.trim();
+  if (k === 'done') tr.classList.toggle('done', !!v);
+  if (c.t === 'url'){ var old = $('.open', el.parentNode); if (old) old.remove(); el.insertAdjacentHTML('afterend', openLink(v)); }
+  saveCell(tr.dataset.id, k, v).catch(function(){});
+});
+
+document.addEventListener('input', function(e){
+  if (e.target.tagName === 'TEXTAREA') grow(e.target);
+  if (e.target.id === 'q'){
+    S.q = e.target.value;
+    clearTimeout(qTimer); qTimer = setTimeout(drawSheet, 150);
+  }
+});
+
+window.addEventListener('hashchange', function(){ var h = location.hash.slice(1); if (TAB[h] && h !== S.tab && $('#tabs')) goTab(h); });
+
+// Coming back to the tab picks up what the other person changed, unless you're mid-edit.
+document.addEventListener('visibilitychange', async function(){
+  if (document.visibilityState !== 'visible' || !S.user || !S.loadedAt || !$('#tabs')) return;
+  if (Date.now() - S.loadedAt < 30000) return;
+  var a = document.activeElement;
+  if (a && a.closest && a.closest('#sheet')) return;
+  try {
+    S.rows = await api.rows(); S.loadedAt = Date.now();
+    drawMeta(); drawTabs();
+    if (!TAB[S.tab].jobs) drawSheet(); else loadJobCounts();
+  } catch (e){}
+});
+
+boot();
+</script>
+</body>
+</html>
