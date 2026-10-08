@@ -254,18 +254,20 @@ table.sheet{border-collapse:collapse;width:100%}
 .lnk{background:none;border:0;padding:0;font:inherit;color:var(--teal-t);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
 .job.hl{outline:2.5px solid var(--teal);outline-offset:2px}
 
-/* jobs you applied to */
+/* job cards (built like the school cards) */
 .appsum{color:var(--slate);margin:0 0 12px;font-size:15px}
-.appf{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:4px 0 12px}
-.appf label{display:flex;flex-direction:column;gap:3px;min-width:0}
-.appf label>span{font:500 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
-.appf select,.appf input{border:1.5px solid var(--line2);border-radius:8px;padding:6px 9px;font-size:15px;background:#fff;color:var(--ink)}
-.appf .grow{flex:1 1 280px}
-.appf .grow input{width:100%}
-.o-interview .appf select{background:var(--teal-tint);border-color:#9FCFD2;color:var(--teal-t);font-weight:600}
-.o-offer .appf select{background:#E7F3E3;border-color:#A9CF9D;color:#2F6B22;font-weight:600}
-.job.o-passed-over{background:var(--mist)}
-.job.o-passed-over h3 a{color:var(--slate)}
+.jc .sch h3 a{color:var(--ink);text-decoration:none}
+.jc .sch h3 a:hover{color:var(--teal-t);text-decoration:underline}
+.jc .scon .sv{min-width:0}
+.jc .scon input{width:100%;min-width:0;border:1.5px solid var(--line2);border-radius:8px;padding:4px 8px;font-size:15px;background:#fff;color:var(--ink)}
+.jc .scon input:focus{border-color:var(--teal);outline:none}
+.jpill{flex:none;font-size:14px;font-weight:600;border-radius:999px;padding:3px 11px;background:var(--mist);border:1.5px solid var(--rule2);color:var(--slate);white-space:nowrap}
+.jc.o-waiting-to-hear .ssel select{background:#fff;border-color:var(--line2);color:var(--ink)}
+.jc.o-offer .ssel select{background:#E7F3E3;border-color:#A9CF9D;color:#2F6B22}
+.jc.o-passed-over{background:var(--mist)}
+.jc.o-passed-over .ssel select{background:#fff;border-color:var(--rule2);color:var(--slate)}
+.jc.o-passed-over .sch h3 a{color:var(--slate)}
+.sc.unfolded .ssec.fold .v{display:block;overflow:visible}
 
 /* undo toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
@@ -510,7 +512,7 @@ var api = DEMO ? demoApi() : {
   },
   setJob: async function(id, status){ must(await sb.from('jobs').update({status: status}).eq('id', id)); },
   opps: async function(){
-    return must(await sb.from('opportunities').select('id,kind,title,org,location,url,deadline,status,description')
+    return must(await sb.from('opportunities').select('id,kind,title,org,location,url,deadline,status,description,amount_raw')
       .in('status', ['new', 'watch', 'pursue']).order('deadline', {ascending: true, nullsFirst: false}).limit(200));
   },
   oppCount: async function(){
@@ -557,7 +559,8 @@ function demoApi(){
     {id: 6, employer_name: 'Example County', title: 'Example Budget Analyst', location: 'Hillsboro, OR', status: 'user_rejected', canonical_url: 'https://example.com/job/6', first_seen: iso(50), updated_at: iso(4)}
   ];
   rows.push((function(){ var r = mk('applications', {job_id: 3, applied_on: '2026-09-20', outcome: 'Passed over', note: 'Example: the job site says no longer under consideration.'}, 70); r.source = 'jobs'; r.ext_id = 'job-3'; return r; })());
-  var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', description: 'Demo opportunity.'}];
+  var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', amount_raw: '$10,000 - $50,000',
+    description: 'Demo opportunity. Example text long enough to fold: it funds projects that bring people together around the arts, with a match required and a letter of intent due first. Nothing here is real.'}];
   function copy(v){ return new Promise(function(res){ setTimeout(function(){ res(JSON.parse(JSON.stringify(v))); }, 120); }); }
   function find(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
   return {
@@ -821,6 +824,19 @@ function drawSheet(){
   box.innerHTML = h;
   drawLists(t);
   box.querySelectorAll('textarea').forEach(grow);
+  if (t.view === 'cards') trimFolds(box);
+}
+
+// a Show all that would show nothing more (the text already fits in three lines) goes away
+function trimFolds(root){
+  (root || document).querySelectorAll('.sc').forEach(function(c){
+    var f = c.querySelectorAll('.ssec.fold .v');
+    if (!f.length) return;
+    var cut = Array.prototype.some.call(f, function(v){ return v.scrollHeight > v.clientHeight + 2; });
+    if (cut) return;
+    c.querySelectorAll('.ssec.fold').forEach(function(x){ x.classList.remove('fold'); });
+    var m = c.querySelector('.mlink'); if (m) m.remove();
+  });
 }
 
 // a short table (Rentals, Houses to buy) shows only its brief columns; the rest open under the row with Details
@@ -1463,9 +1479,10 @@ async function loadJobList(){
         : view === 'passed' && S.jobQ.trim() ? 'No passed job matches that.' : 'Nothing here.') + '</div>';
       return;
     }
-    if (view === 'applied'){ el.innerHTML = '<p class="appsum" id="appsum"></p>' + sortApplied(list).map(appliedCard).join(''); drawAppSum(); return; }
+    if (view === 'applied'){ el.innerHTML = '<p class="appsum" id="appsum"></p><div class="scards">' + sortApplied(list).map(appliedCard).join('') + '</div>'; drawAppSum(); return; }
     el.innerHTML = (view === 'passed' ? '<p class="appsum">' + (S.jobQ.trim() ? 'Matching passed jobs, most recently passed first.' : 'The last 100 you passed, most recent first. Search for older ones.') + '</p>' : '') +
-      list.map(view === 'opps' ? oppCard : jobCard).join('');
+      '<div class="scards">' + list.map(view === 'opps' ? oppCard : jobCard).join('') + '</div>';
+    if (view === 'opps') trimFolds(el);
   } catch (e){
     if ($('#jlist')) $('#jlist').innerHTML = '<div class="err">Could not load the jobs: ' + esc(e.message || e) + '</div>';
   }
@@ -1491,22 +1508,20 @@ function sortApplied(list){
 
 function drawAppSum(){
   var el = $('#appsum'); if (!el) return;
-  var cards = document.querySelectorAll('.job.app'), n = {};
+  var cards = document.querySelectorAll('.jc.app'), n = {};
   cards.forEach(function(c){ var o = outcomeOf(Number(c.dataset.card)); n[o] = (n[o] || 0) + 1; });
   el.textContent = cards.length + ' applied: ' + OUTCOMES.filter(function(o){ return n[o]; }).map(function(o){ return n[o] + ' ' + o.toLowerCase(); }).join(', ') + '.';
 }
 
 function appliedCard(j){
-  var a = appFor(j.id), d = a ? a.data : {}, out = d.outcome || 'Waiting to hear', u = safeUrl(j.canonical_url);
-  var meta = [j.employer_name, j.location || 'location unlisted', fmtSalary(j)].filter(Boolean).map(esc).join(' · ');
-  var at = ' data-job-id="' + j.id + '"';
-  return '<article class="job app o-' + oslug(out) + '" data-card="' + j.id + '" data-status="applied"><h3>' +
-    (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) + '</h3><p class="jm">' + meta + '</p>' +
-    '<div class="appf"><label><span>Result</span><select data-app="outcome"' + at + '>' + OUTCOMES.map(function(o){
-      return '<option' + (o === out ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></label>' +
-    '<label><span>Applied</span><input type="date" data-app="applied_on"' + at + ' value="' + esc(d.applied_on || '') + '"></label>' +
-    '<label class="grow"><span>Note</span><input type="text" data-app="note"' + at + ' value="' + esc(d.note || '') + '" placeholder="Interview date, who you talked to, the job number"></label></div>' +
-    '<div class="acts"><button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button></div></article>';
+  var a = appFor(j.id), d = a ? a.data : {}, out = d.outcome || 'Waiting to hear', at = ' data-job-id="' + j.id + '"', sal = fmtSalary(j);
+  var result = '<div class="ssel"><select data-app="outcome"' + at + ' aria-label="Result">' + OUTCOMES.map(function(o){
+    return '<option' + (o === out ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>';
+  var lines = (sal ? jline('Salary', esc(sal)) : '') +
+    '<span class="k2">Applied</span><div class="sv"><input type="date" data-app="applied_on"' + at + ' value="' + esc(d.applied_on || '') + '" aria-label="Date applied"></div>' +
+    '<span class="k2">Note</span><div class="sv"><input type="text" data-app="note"' + at + ' value="' + esc(d.note || '') + '" placeholder="Interview date, who you talked to, the job number" aria-label="Note"></div>';
+  return jobShell(j, 'app o-' + oslug(out), result, lines, postingBtn(j),
+    '<span class="edited">Found ' + esc(day(j.first_seen)) + '</span><span class="sp"></span><button class="mini" data-job="queued" data-id="' + j.id + '">Back to the queue</button>');
 }
 
 // A result, date or note saves to the job's record in move_rows, made the first time it's needed.
@@ -1533,8 +1548,8 @@ async function saveApp(jobId, k, v, retried){
     return;
   }
   if (k === 'outcome'){
-    var card = document.querySelector('.job.app[data-card="' + jobId + '"]');
-    if (card) card.className = 'job app o-' + oslug(v || 'Waiting to hear');
+    var card = document.querySelector('.jc.app[data-card="' + jobId + '"]');
+    if (card) card.className = 'sc jc app o-' + oslug(v || 'Waiting to hear');
     drawAppSum(); drawMeta();
   }
 }
@@ -1544,27 +1559,45 @@ function fmtSalary(j){
   return j.salary_raw ? String(j.salary_raw).slice(0, 50) : '';
 }
 
-function jobCard(j){
+// Job cards are built like the school cards: the title (linked to the posting) with a status on the right, the
+// employer and place under it, a few labelled lines, the main buttons, and a footer with the date found.
+function jobShell(j, cls, right, lines, buttons, foot){
   var u = safeUrl(j.canonical_url);
-  var meta = [j.employer_name, j.location || 'location unlisted', fmtSalary(j)].filter(Boolean).map(esc).join(' · ');
-  var pill = j.status === 'applied' ? '<span class="pill">Applied</span> ' : j.status === 'user_rejected' ? '<span class="pill">Passed</span> ' : '';
-  var acts = j.status === 'queued'
-    ? '<button class="btn small primary" data-job="applied" data-id="' + j.id + '">Applied</button><button class="btn small quiet" data-job="user_rejected" data-id="' + j.id + '">Pass</button>'
-    : (j.status === 'user_rejected' ? '<button class="btn small primary" data-job="applied" data-id="' + j.id + '">Mark applied</button>' : '') +
-      '<button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button>';
-  return '<article class="job" data-card="' + j.id + '" data-status="' + esc(j.status) + '"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) +
-    '</h3><p class="jm">' + pill + meta + '</p><div class="acts">' + acts + '</div></article>';
+  return '<article class="sc jc' + (cls ? ' ' + cls : '') + '" data-card="' + j.id + '" data-status="' + esc(j.status) + '">' +
+    '<div class="sch"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) + '</h3>' + (right || '') + '</div>' +
+    '<p class="ssub">' + [j.employer_name, j.location || 'Location not listed'].filter(Boolean).map(esc).join(' · ') + '</p>' +
+    (lines ? '<div class="scon">' + lines + '</div>' : '') +
+    (buttons ? '<div class="slinks">' + buttons + '</div>' : '') +
+    '<div class="sfoot">' + foot + '</div></article>';
+}
+function jline(k, v){ return '<span class="k2">' + k + '</span><p>' + v + '</p>'; }
+function postingBtn(j){
+  var u = safeUrl(j.canonical_url);
+  return u ? '<a class="btn small quiet" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open posting</a>' : '';
+}
+
+function jobCard(j){
+  var sal = fmtSalary(j), lines = sal ? jline('Salary', esc(sal)) : '', id = ' data-id="' + j.id + '"';
+  var foot = '<span class="edited">Found ' + esc(day(j.first_seen)) + '</span>';
+  if (j.status === 'user_rejected') return jobShell(j, 'passed', '<span class="jpill">Passed</span>', lines,
+    '<button class="btn small primary" data-job="applied"' + id + '>Mark applied</button><button class="btn small quiet" data-job="queued"' + id + '>Back to the queue</button>' + postingBtn(j), foot);
+  return jobShell(j, '', '', lines,
+    '<button class="btn small primary" data-job="applied"' + id + '>Applied</button><button class="btn small quiet" data-job="user_rejected"' + id + '>Pass</button>' + postingBtn(j), foot);
 }
 
 function oppCard(o){
-  var u = safeUrl(o.url);
-  var meta = [o.org, o.location, o.deadline ? 'due ' + day(o.deadline) : 'rolling'].filter(Boolean).map(esc).join(' · ');
-  return '<article class="job" data-card="' + o.id + '"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(o.title) + '</a>' : esc(o.title)) +
-    '</h3><p class="jm"><span class="pill">' + esc(o.kind) + '</span> <span class="pill">' + esc(o.status) + '</span> ' + meta + '</p>' +
-    (o.description ? '<p class="jd">' + esc(o.description) + '</p>' : '') +
-    '<div class="acts"><button class="btn small quiet" data-opp="watch" data-id="' + o.id + '">Watch</button>' +
-    '<button class="btn small primary" data-opp="pursue" data-id="' + o.id + '">Pursue</button>' +
-    '<button class="btn small quiet" data-opp="dismissed" data-id="' + o.id + '">Dismiss</button></div></article>';
+  var u = safeUrl(o.url), id = ' data-id="' + o.id + '"';
+  var lines = jline('Due', esc(o.deadline ? day(o.deadline) : 'Rolling')) + (o.amount_raw ? jline('Amount', esc(o.amount_raw)) : '');
+  var desc = o.description ? '<div class="ssec' + (String(o.description).length > 150 ? ' fold' : '') + '"><p class="k">About</p><p class="v">' + esc(o.description) + '</p></div>' +
+    (String(o.description).length > 150 ? '<button class="mini mlink" data-unfold>Show all</button>' : '') : '';
+  var stat = {new: 'New', watch: 'Watching', pursue: 'Pursuing'}[o.status] || o.status;
+  return '<article class="sc jc opp" data-card="' + o.id + '"><div class="sch"><h3>' +
+    (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(o.title) + '</a>' : esc(o.title)) + '</h3><span class="jpill">' + esc(stat) + '</span></div>' +
+    '<p class="ssub">' + [o.kind ? o.kind.charAt(0).toUpperCase() + o.kind.slice(1) : '', o.org, o.location].filter(Boolean).map(esc).join(' · ') + '</p>' +
+    '<div class="scon">' + lines + '</div>' + desc +
+    '<div class="slinks"><button class="btn small primary" data-opp="pursue"' + id + '>Pursue</button><button class="btn small quiet" data-opp="watch"' + id + '>Watch</button>' +
+    (u ? '<a class="btn small quiet" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open</a>' : '') + '</div>' +
+    '<div class="sfoot"><span class="sp"></span><button class="mini" data-opp="dismissed"' + id + '>Dismiss</button></div></article>';
 }
 
 async function jobAction(id, status, prev){
@@ -1629,6 +1662,12 @@ document.addEventListener('click', async function(e){
     drawPins(true); return;
   }
   if (b.dataset.showrow){ showRow(b.dataset.showrow); return; }
+  if (b.hasAttribute('data-unfold')){
+    var uc = b.closest('.sc'); if (!uc) return;
+    uc.classList.toggle('unfolded');
+    b.textContent = uc.classList.contains('unfolded') ? 'Show less' : 'Show all';
+    return;
+  }
   var act = b.dataset.act; if (!act) return;
   if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
   if (act === 'add'){ addRow(); return; }
