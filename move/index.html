@@ -253,14 +253,15 @@ var AREAS = ['West Linn', 'Sherwood', 'Mount Tabor area', 'Grant High area', 'Se
 var SCHOOL_SEARCHES = ['Grant High School', 'Beaumont Middle School', 'Harrison Park School', 'Sellwood Middle School',
                        'Athey Creek Middle School', 'Rosemont Ridge Middle School'];
 // The school behind each search, as a pin on the Map tab. Address as the school's own homepage gives it
-// (read 8 Oct 2026), position from the Census geocoder. Athey Creek has none: the Census address data
-// doesn't have 2110 Brandon Place. load_listing_emails.py --schools prints these lines from its saved answers.
+// (read 8 Oct 2026), position from the Census geocoder. Athey Creek's comes from OpenStreetMap instead (its
+// school point in the map's own tiles, about 370 m from Brandon Place): the Census address data doesn't have
+// 2110 Brandon Place. load_listing_emails.py --schools prints these lines.
 var SCHOOL_PINS = [
   {search: 'Grant High School', name: 'Grant High School', short: 'Grant High', addr: '2245 NE 36th Avenue, Portland, OR 97212', url: 'https://grant.pps.net/', lat: 45.53944, lon: -122.626107},
   {search: 'Beaumont Middle School', name: 'Beaumont Middle School', short: 'Beaumont', addr: '4043 NE Fremont, Portland, OR 97212', url: 'https://beaumont.pps.net/', lat: 45.548355, lon: -122.621358},
   {search: 'Harrison Park School', name: 'Harrison Park Middle School', short: 'Harrison Park', addr: '2225 SE 87th Ave, Portland, OR 97216', url: 'https://harrisonpark.pps.net/', lat: 45.506658, lon: -122.574302},
   {search: 'Sellwood Middle School', name: 'Sellwood Middle School', short: 'Sellwood', addr: '8300 SE 15th Ave, Portland, OR 97202', url: 'https://sellwood.pps.net/', lat: 45.462838, lon: -122.650929},
-  {search: 'Athey Creek Middle School', name: 'Athey Creek Middle School', short: 'Athey Creek', addr: '2110 Brandon Place, West Linn, OR 97068', url: 'https://atheycreek.wlwv.k12.or.us/'},
+  {search: 'Athey Creek Middle School', name: 'Athey Creek Middle School', short: 'Athey Creek', addr: '2110 Brandon Place, West Linn, OR 97068', url: 'https://atheycreek.wlwv.k12.or.us/', lat: 45.34851, lon: -122.67223},
   {search: 'Rosemont Ridge Middle School', name: 'Rosemont Ridge Middle School', short: 'Rosemont Ridge', addr: '20001 Salamo Road, West Linn, OR 97068', url: 'https://rosemontridge.wlwv.k12.or.us/', lat: 45.36859, lon: -122.646957}
 ];
 var PEOPLE = ['Jeffrey', 'Paige', 'Both'];
@@ -901,7 +902,7 @@ var MAP_SRI = {js: 'sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFm
 var MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 var MAP_BOX = [-122.80, 45.33, -122.52, 45.60];          // Portland down to West Linn, until the pins set the view
 var MAP_KINDS = [['all', 'All homes'], ['rentals', 'Rentals'], ['buy', 'Houses to buy']];
-var M = {map: null, gl: null, markers: [], gen: 0, libP: null, styleP: null, fitted: false};
+var M = {map: null, gl: null, markers: [], pts: [], gen: 0, libP: null, styleP: null, fitted: false, moved: false, ro: null};
 
 // OpenFreeMap's light style, warmed to the board's paper, as in the lab
 var MAP_PAPER = '#F3EEE6', MAP_WATER = '#BFD7E3', MAP_CASE = '#D9CEBC';
@@ -1028,13 +1029,21 @@ function startMap(){
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
     map.addControl(new gl.NavigationControl({showCompass: false}), 'top-right');
-    M.map = map; M.gl = gl; M.fitted = false;
+    M.map = map; M.gl = gl; M.fitted = false; M.moved = false;
+    map.on('movestart', function(e){ if (e.originalEvent) M.moved = true; });
+    // the map measures its box once; if the box changes size later (a window resize, or a tab opened in the
+    // background), measure again and, until someone has moved the map, take in all the pins again
+    if ('ResizeObserver' in window){
+      M.ro = new ResizeObserver(function(){ if (M.map !== map) return; map.resize(); if (!M.moved) fitPins(); });
+      M.ro.observe(box);
+    }
     drawPins(true);
   }).catch(function(){ if (gen === M.gen) mapMsg('The map didn’t load. Check the connection, then open the tab again.'); });
 }
 function mapMsg(text){ var w = $('.mapwrap'); if (w) w.insertAdjacentHTML('beforeend', '<div class="mapmsg">' + esc(text) + '</div>'); }
 function dropMap(){
   M.gen++;
+  if (M.ro){ M.ro.disconnect(); M.ro = null; }
   if (M.map){ try { M.map.remove(); } catch (e){} }
   M.map = null; M.markers = [];
 }
@@ -1073,11 +1082,16 @@ function drawPins(fit){
     add(el, r.data._lon, r.data._lat, homePop(r), (rent ? 'Rental' : 'For sale') + (isNew ? ', new: ' : ': ') + (r.data.address || '') + (price ? ', ' + price + (rent ? ' a month' : '') : ''));
     pts.push([r.data._lon, r.data._lat]);
   });
-  if (fit && pts.length){
-    var b = pts.reduce(function(a, q){ return [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])]; }, [180, 90, -180, -90]);
-    map.fitBounds(b, {padding: {top: 50, bottom: 60, left: 40, right: 110}, maxZoom: 14, duration: M.fitted ? 600 : 0});
-    M.fitted = true;
-  }
+  M.pts = pts;
+  if (fit) fitPins();
+}
+
+function fitPins(){
+  var map = M.map, pts = M.pts;
+  if (!map || !pts.length) return;
+  var b = pts.reduce(function(a, q){ return [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])]; }, [180, 90, -180, -90]);
+  map.fitBounds(b, {padding: {top: 50, bottom: 60, left: 40, right: 110}, maxZoom: 14, duration: M.fitted ? 600 : 0});
+  M.fitted = true;
 }
 
 function homePop(r){
