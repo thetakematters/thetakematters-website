@@ -138,6 +138,14 @@ table.sheet{border-collapse:collapse;width:100%}
 .dgrid .f.wide{grid-column:1/-1}
 .dgrid .k{font:500 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:0 0 2px}
 .dgrid .v{font-size:15px;line-height:1.5;margin:0;overflow-wrap:anywhere;max-width:860px}
+.sheet .mbtn.on{display:inline-block}
+.ff input:not([type=checkbox]),.ff select,.ff textarea{width:100%;min-width:0;border:1.5px solid var(--line2);background:#fff;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1.4}
+.ff input:focus,.ff select:focus,.ff textarea:focus{border-color:var(--teal);outline:none}
+.ff textarea{resize:vertical;min-height:58px;overflow:hidden;display:block}
+.ff input[type=checkbox]{width:20px;height:20px;accent-color:var(--teal);margin:6px 0}
+.ff .cur{color:var(--slate);padding-right:4px}
+.ff .open{font-size:13.5px;font-weight:600;white-space:nowrap;padding:0 6px}
+.sheet.brief .open{padding:0 4px}
 .tl{display:flex;flex-wrap:wrap;gap:2px 12px;padding:0 9px 5px;font-size:13.5px;font-weight:600}
 .tl a{white-space:nowrap}
 .sheet td.rt{white-space:nowrap;text-align:right;vertical-align:middle;padding-right:8px}
@@ -147,6 +155,36 @@ table.sheet{border-collapse:collapse;width:100%}
 .sheet tr.fresh td{background:var(--teal-tint)}
 .sheet tr.arch td{background:var(--mist)}
 .sheet tr.arch .cv{opacity:.6}
+
+/* the Schools cards */
+.scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:16px}
+.sc{background:var(--card);border:1px solid var(--rule);border-radius:16px;padding:16px 18px 10px;display:flex;flex-direction:column;min-width:0}
+.sc.fresh{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-tint)}
+.sc.arch{background:var(--mist)}
+.sc.arch>*:not(.sfoot){opacity:.6}
+.sch{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sch h3{font:500 22px/1.2 var(--serif);margin:0;min-width:0}
+.ssel{flex:none}
+.ssel select{border:1.5px solid #C7E0E0;border-radius:999px;background:var(--teal-tint);color:var(--teal-t);font-size:14px;font-weight:600;padding:3px 8px}
+.ssub{color:var(--slate);font-size:14.5px;margin:4px 0 12px}
+.scon{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:15px;margin:0 0 12px;align-items:baseline}
+.scon .k2{font:500 12px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.scon p{margin:0;overflow-wrap:anywhere}
+.slinks{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
+.ssec{border-top:1px solid var(--rule);padding:10px 0 2px;margin-top:8px}
+.ssec .k{font:500 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:0 0 3px}
+.ssec .v{font-size:14.5px;line-height:1.55;margin:0;overflow-wrap:anywhere}
+.ssec.fold .v{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mlink{color:var(--teal-t);padding:3px 0;margin-top:2px;align-self:flex-start}
+.sfoot{display:flex;align-items:center;gap:6px;margin-top:auto;padding-top:10px;border-top:1px solid var(--rule)}
+.sc .sfoot{margin-top:12px}
+.sfoot .sp{flex:1}
+
+/* forms: a card being edited, and Details under a short-table row */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 16px;margin:12px 0 4px}
+.ff{display:block;min-width:0}
+.ff.wide{grid-column:1/-1}
+.ff>span{display:block;font:500 12px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:0 0 3px}
 
 /* jobs */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
@@ -246,6 +284,10 @@ table.sheet{border-collapse:collapse;width:100%}
   .sheet tr.det>td{display:block;background:none;border:0}
   .sheet tr.det>td::before{content:none}
   .detail{position:static;width:auto;padding:8px 2px 6px}
+  .scards{grid-template-columns:minmax(0,1fr)}
+  .sc{padding:14px 14px 10px}
+  .sch h3{font-size:20px}
+  .fgrid{grid-template-columns:minmax(0,1fr)}
   .sheet tr.done{background:#F7F4EE}
   .sheet tr.fresh{background:var(--teal-tint)}
   .sheet tr.arch{background:var(--mist)}
@@ -297,7 +339,7 @@ var TABS = [
      {k: 'who', l: 'Who', t: 'who', w: 130},
      {k: 'done', l: 'Done', t: 'check', w: 70},
      {k: 'notes', l: 'Notes', t: 'long', w: 300}]},
-  {key: 'schools', label: 'Schools', add: 'Add a school',
+  {key: 'schools', label: 'Schools', add: 'Add a school', view: 'cards',
    blurb: 'The schools behind your searches, with how to enroll, who to call or email, and the dates that matter. Before you rent or buy, put the address into Check an address to see which schools it’s assigned to.',
    sort: {k: 'area', dir: 1}, defaults: {status: 'To look at'},
    cols: [
@@ -316,6 +358,7 @@ var TABS = [
      {k: 'visit', l: 'Tours and visits', t: 'long', w: 300},
      {k: 'notes', l: 'Notes', t: 'long', w: 280}]},
   {key: 'rentals', label: 'Rentals', add: 'Add a rental', feed: true,
+   brief: ['address', 'rent', 'beds', 'baths', 'sqft', 'area', 'status', 'link'],
    blurb: 'New rentals from the Zillow alerts wait at the top. Save keeps one in the list below, Pass sets it aside. Add a rental for one you find yourself.',
    sort: {k: 'status', dir: 1}, defaults: {status: 'New'},
    liked: ['Like', 'Contacted', 'Toured', 'Applied'],
@@ -336,6 +379,7 @@ var TABS = [
      {k: 'link', l: 'Link', t: 'url', w: 190},
      {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
   {key: 'buy', label: 'Houses to buy', add: 'Add a house', feed: true,
+   brief: ['address', 'price', 'beds', 'baths', 'sqft', 'area', 'status', 'link'],
    blurb: 'Houses for sale from the Zillow alerts. New ones wait at the top. Save keeps one in the list below, Pass sets it aside.',
    sort: {k: 'status', dir: 1}, defaults: {status: 'New'},
    liked: ['Like', 'Toured', 'Offer'],
@@ -389,7 +433,7 @@ var TABS = [
 var TAB = {};
 TABS.forEach(function(t){ TAB[t.key] = t; });
 
-var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
+var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, editing: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
          loadedAt: 0, saving: 0, saveErr: ''};
 
@@ -612,7 +656,7 @@ function drawTabs(){
 
 function goTab(key){
   if (!TAB[key]) return;
-  S.tab = key; S.q = ''; S.search = ''; S.fresh = {}; S.open = {};
+  S.tab = key; S.q = ''; S.search = ''; S.fresh = {}; S.open = {}; S.editing = {};
   history.replaceState(null, '', '#' + key);
   drawTabs(); drawView();
   var bar = $('.tbar');
@@ -725,13 +769,16 @@ function drawSheet(){
   if (!rows.length){
     h += '<div class="empty">' + (any ? 'Nothing matches. Clear the search or filters to see every row.'
       : t.feed ? 'Nothing saved yet. Save a new listing' + (fresh.length ? ' above' : '') + ', or add one below.' : 'Nothing here yet. Add the first row below.') + '</div>';
+  } else if (t.view === 'cards'){
+    h += '<div class="scards">' + rows.map(function(r){ return schoolCard(t, r); }).join('') + '</div>';
   } else {
-    h += '<div class="sheet-wrap"><table class="sheet"><thead><tr>' + t.cols.map(function(c){
+    var cols = shownCols(t);
+    h += '<div class="sheet-wrap"><table class="sheet' + (t.brief ? ' brief' : '') + '"><thead><tr>' + cols.map(function(c){
       var on = s.k === c.k;
-      return '<th style="min-width:' + (c.w || 120) + 'px" aria-sort="' + (on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + c.k + '">' +
+      return '<th style="min-width:' + colW(t, c) + 'px" aria-sort="' + (on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + c.k + '">' +
         esc(c.l) + (on ? ' <span class="arr">' + (s.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</button></th>';
     }).join('') + '<th><span class="sr">Row</span></th></tr></thead><tbody>' +
-      rows.map(function(r){ return rowHtml(t, r) + (S.open[r.id] ? detHtml(t, r) : ''); }).join('') + '</tbody></table></div>';
+      rows.map(function(r){ return rowHtml(t, r, cols) + (S.open[r.id] ? (t.brief ? formDetHtml(t, r, cols) : detHtml(t, r)) : ''); }).join('') + '</tbody></table></div>';
   }
   h += '<button class="addrow" data-act="add">+ ' + esc(t.add) + '</button>';
   box.innerHTML = h;
@@ -739,11 +786,17 @@ function drawSheet(){
   box.querySelectorAll('textarea').forEach(grow);
 }
 
-function rowHtml(t, r){
-  var cls = [r.data.done ? 'done' : '', r.archived ? 'arch' : '', S.fresh[r.id] ? 'fresh' : ''].join(' ').trim();
-  var more = '<button class="mini mbtn" data-act="more" aria-expanded="' + !!S.open[r.id] + '">' + (S.open[r.id] ? 'Less' : 'More') + '</button>';
+// a short table (Rentals, Houses to buy) shows only its brief columns; the rest open under the row with Details
+function shownCols(t){ return t.brief ? t.cols.filter(function(c){ return t.brief.indexOf(c.k) >= 0; }) : t.cols; }
+function colW(t, c){ return t.brief && c.t === 'url' ? 80 : (c.w || 120); }
+
+function rowHtml(t, r, cols){
+  cols = cols || t.cols;
+  var cls = [r.data.done ? 'done' : '', r.archived ? 'arch' : '', S.fresh[r.id] ? 'fresh' : ''].join(' ').trim(), open = !!S.open[r.id];
+  var more = '<button class="mini mbtn' + (t.brief ? ' on' : '') + '" data-act="more" aria-expanded="' + open + '">' +
+    (t.brief ? (open ? 'Hide' : 'Details') : (open ? 'Less' : 'More')) + '</button>';
   return '<tr data-id="' + esc(r.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
-    t.cols.map(function(c, i){ var h = cell(t, c, r.data[c.k]); return i ? h : h.replace(/<\/div><\/td>$/, more + '</div></td>'); }).join('') +
+    cols.map(function(c, i){ var h = cell(t, c, r.data[c.k], !!t.brief); return i ? h : h.replace(/<\/div><\/td>$/, more + '</div></td>'); }).join('') +
     '<td class="rt"><span class="edited">' + esc(edited(r)) + '</span>' +
     (r.archived ? '<button class="mini" data-act="restore">Restore</button>'
                 : '<button class="mini warn" data-act="archive" aria-label="Archive this row">Archive</button>') +
@@ -752,7 +805,17 @@ function rowHtml(t, r){
 
 function edited(r){ return r.updated_by ? whoOf(r.updated_by) + ', ' + day(r.updated_at) : ''; }
 
-function cell(t, c, v){
+function cell(t, c, v, compact){
+  var inner = compact && c.t === 'url' ? openLink(v) : cellInner(t, c, v);
+  return '<td data-label="' + esc(c.l) + '"><div class="cv' + (c.t === 'long' ? ' cvl' : '') + '">' + inner + '</div></td>';
+}
+
+function fieldHtml(t, c, v){
+  return '<label class="ff' + (c.t === 'long' ? ' wide' : '') + '"><span>' + esc(c.l) + '</span><div class="cv' + (c.t === 'long' ? ' cvl' : '') + '">' +
+    cellInner(t, c, v) + '</div></label>';
+}
+
+function cellInner(t, c, v){
   var a = ' data-k="' + c.k + '" aria-label="' + esc(c.l) + '"', inner;
   if (v == null) v = '';
   switch (c.t){
@@ -771,7 +834,52 @@ function cell(t, c, v){
     case 'suggest': inner = '<input type="text" list="dl-' + t.key + '-' + c.k + '"' + a + ' value="' + esc(v) + '">'; break;
     default: inner = '<input type="text"' + a + ' value="' + esc(v) + '">';
   }
-  return '<td data-label="' + esc(c.l) + '"><div class="cv' + (c.t === 'long' ? ' cvl' : '') + '">' + inner + '</div></td>';
+  return inner;
+}
+
+// Details under a short-table row: every other field, editable (links too, since the row only shows Open)
+function formDetHtml(t, r, cols){
+  var fields = t.cols.filter(function(c){ return cols.indexOf(c) < 0 || c.t === 'url'; });
+  return '<tr class="det" data-det="' + esc(r.id) + '" data-form="1"><td colspan="' + (cols.length + 1) + '"><div class="detail" data-id="' + esc(r.id) + '">' +
+    '<div class="fgrid">' + fields.map(function(c){ return fieldHtml(t, c, r.data[c.k]); }).join('') + '</div></div></td></tr>';
+}
+
+// The Schools tab is cards: everything at a glance, the status right on the card, and Edit for the rest.
+var CARD_LINKS = [['link', 'Website'], ['enroll', 'How to enroll'], ['finder', 'Check an address']];
+var CARD_LINES = [['address', 'Address'], ['phone', 'Office'], ['email', 'Email']];
+var CARD_SECS = [['dates', 'Key dates'], ['visit', 'Tours and visits'], ['notes', 'Notes']];
+function schoolCard(t, r){
+  var d = r.data, cls = 'sc' + (r.archived ? ' arch' : '') + (S.fresh[r.id] ? ' fresh' : '');
+  var foot = function(btn){
+    return '<div class="sfoot"><span class="edited">' + esc(edited(r)) + '</span><span class="sp"></span>' + btn +
+      (r.archived ? '<button class="mini" data-act="restore">Restore</button>' : '<button class="mini warn" data-act="archive" aria-label="Archive this school">Archive</button>') + '</div>';
+  };
+  if (S.editing[r.id]) {
+    return '<article class="' + cls + ' editing" data-id="' + esc(r.id) + '"><div class="sch"><h3>' + esc(d.school || 'New school') + '</h3></div>' +
+      '<div class="fgrid">' + t.cols.map(function(c){ return fieldHtml(t, c, d[c.k]); }).join('') + '</div>' +
+      foot('<button class="btn small primary" data-act="edit">Done</button>') + '</article>';
+  }
+  var sub = [d.level, d.district, d.area].filter(Boolean).map(esc).join(' · ');
+  var lines = CARD_LINES.filter(function(x){ return d[x[0]]; }).map(function(x){
+    return '<span class="k2">' + x[1] + '</span><p>' + (x[0] === 'address' ? esc(d[x[0]]) : linkify(d[x[0]])) + '</p>';
+  }).join('');
+  var links = CARD_LINKS.map(function(x){
+    var u = safeUrl(d[x[0]]);
+    return u ? '<a class="btn small quiet" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + x[1] + '</a>' : '';
+  }).join('');
+  // long sections fold to three lines, so the cards stay short and even; Show all opens them on that card
+  var open = !!S.open[r.id], folds = 0;
+  var secs = CARD_SECS.filter(function(x){ return d[x[0]]; }).map(function(x){
+    var fold = String(d[x[0]]).length > 150;
+    if (fold) folds++;
+    return '<div class="ssec' + (fold && !open ? ' fold' : '') + '"><p class="k">' + x[1] + '</p><p class="v">' + linkify(d[x[0]]) + '</p></div>';
+  }).join('') + (folds ? '<button class="mini mlink" data-act="more" aria-expanded="' + open + '">' + (open ? 'Show less' : 'Show all') + '</button>' : '');
+  return '<article class="' + cls + '" data-id="' + esc(r.id) + '">' +
+    '<div class="sch"><h3>' + esc(d.school || 'Untitled school') + '</h3><div class="ssel">' + cellInner(t, colOf(t, 'status'), d.status || '') + '</div></div>' +
+    (sub ? '<p class="ssub">' + sub + '</p>' : '') +
+    (lines ? '<div class="scon">' + lines + '</div>' : '') +
+    (links ? '<div class="slinks">' + links + '</div>' : '') + secs +
+    foot('<button class="mini" data-act="edit">Edit</button>') + '</article>';
 }
 
 // web addresses typed into a long cell (notes, dates) show as links under it, named by their site
@@ -812,7 +920,7 @@ function drawLists(t){
 // while you edit it, and More under the row shows everything.
 var CLIP = 58;
 function grow(el){
-  var editing = document.activeElement === el;
+  var editing = document.activeElement === el || !(el.closest && el.closest('table.sheet') && !el.closest('.detail'));
   el.style.height = 'auto';
   var full = el.scrollHeight + 3;
   el.style.height = (editing ? full : Math.min(full, CLIP)) + 'px';
@@ -908,9 +1016,8 @@ async function saveCell(id, k, v){
     if (v === '' || v === false || v == null) delete d[k]; else d[k] = v;
     return {data: d};
   });
-  var tr = document.querySelector('tr[data-id="' + CSS.escape(id) + '"]');
-  if (tr){ var ed = $('.edited', tr); if (ed) ed.textContent = edited(row); }
-  var det = document.querySelector('tr[data-det="' + CSS.escape(id) + '"]');
+  document.querySelectorAll('[data-id="' + CSS.escape(id) + '"] .edited').forEach(function(ed){ ed.textContent = edited(row); });
+  var det = document.querySelector('tr[data-det="' + CSS.escape(id) + '"]:not([data-form])');
   if (det) det.outerHTML = detHtml(TAB[S.tab], row);
   drawMeta(); drawTabs();
 }
@@ -923,12 +1030,13 @@ async function addRow(){
     S.saving++; S.saveErr = ''; drawSave();
     var r = await api.add(t.key, S.user.email, data);
     S.rows.push(r); S.fresh[r.id] = Date.now();
+    if (t.view === 'cards') S.editing[r.id] = 1;
   } catch (e){
     S.saveErr = (e && e.message) || 'could not add a row'; return;
   } finally { S.saving--; drawSave(); }
   drawSheet(); drawTabs(); drawMeta();
   // the cursor goes to the row's first written field (What, Address, Task), not a date picker
-  var tr = document.querySelector('tr[data-id="' + CSS.escape(r.id) + '"]');
+  var tr = document.querySelector('tr[data-id="' + CSS.escape(r.id) + '"], .sc[data-id="' + CSS.escape(r.id) + '"]');
   var first = tr && tr.querySelector('textarea, input[type=text], input[type=url]');
   if (first) first.focus();
 }
@@ -1395,7 +1503,16 @@ document.addEventListener('click', async function(e){
   if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
   if (act === 'add'){ addRow(); return; }
   if (act === 'csv'){ downloadCsv(); return; }
-  var tr = b.closest('tr[data-id]');
+  var tr = b.closest('tr[data-id], .sc[data-id]');
+  if (tr && act === 'edit'){
+    var eid = tr.dataset.id;
+    if (S.editing[eid]) delete S.editing[eid]; else S.editing[eid] = 1;
+    drawSheet();
+    var card = document.querySelector('.sc[data-id="' + CSS.escape(eid) + '"]');
+    var f = S.editing[eid] && card && card.querySelector('input[type=text]');
+    if (f) f.focus(); else if (card) card.scrollIntoView({block: 'nearest'});
+    return;
+  }
   if (tr && act === 'archive'){ setArchived(tr.dataset.id, true); return; }
   if (tr && act === 'restore'){ setArchived(tr.dataset.id, false); return; }
   if (tr && act === 'more'){
@@ -1411,7 +1528,7 @@ document.addEventListener('change', function(e){
   if (el.id === 'mapSchools'){ S.mapSchools = el.checked; drawPins(false); return; }
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
-  var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id]');
+  var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id], .sc[data-id], .detail[data-id]');
   if (!k || !tr) return;
   var c = colOf(TAB[S.tab], k), v;
   if (el.type === 'checkbox') v = el.checked;
