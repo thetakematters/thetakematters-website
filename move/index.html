@@ -15,6 +15,9 @@
   rows in move_rows (one table, data jsonb holds the cells), so a new column needs
   no database change. The page never deletes: it archives, and every edit first
   copies the earlier row to move_versions. The Jobs tab reads the job scan tables.
+  Rentals and Houses to buy also get homes from the Zillow alert emails (source
+  'zillow', loaded by load_listing_emails.py outside this repo). Those wait in a New
+  list at the top of the tab: Save sets them to Like, Pass archives them.
   Same look as the Oregon Sound Circuit notebook. Local preview with demo data:
   http://localhost:PORT/move/?demo (localhost only, nothing is saved).
 -->
@@ -143,6 +146,18 @@ table.sheet{border-collapse:collapse;width:100%}
 .pill{display:inline-block;font:500 12px/1.4 var(--mono);letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;color:var(--slate)}
 .acts{display:flex;gap:8px;flex-wrap:wrap}
 
+/* the New list on Rentals and Houses to buy */
+.queue{background:var(--teal-tint);border:1px solid #C7E0E0;border-radius:16px;padding:14px 14px 16px;margin:0 0 22px}
+.qh{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+.qh h3,.lh{font:500 22px/1.2 var(--serif);margin:0}
+.qh .c{font:500 13px/1.4 var(--mono);background:var(--card);border:1px solid #C7E0E0;color:var(--teal-t);border-radius:10px;padding:1px 9px}
+.lh{margin:0 0 10px}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.qgrid .job{margin:0;display:flex;flex-direction:column}
+.qgrid .acts{margin-top:auto}
+.lp{font-size:16px;font-weight:600;margin:0 0 6px}
+.lx{font-size:14.5px;color:var(--ink);margin:0 0 5px}
+
 /* undo toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
 .toast button{background:none;border:1.5px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font-weight:600;cursor:pointer}
@@ -158,6 +173,8 @@ table.sheet{border-collapse:collapse;width:100%}
   .meta .k,.save,.pill,.chip .c{font-size:13px}
   .mast-r .who{display:none}
   .tools input[type=search]{width:100%}
+  .queue{padding:12px 10px 12px}
+  .qgrid{grid-template-columns:minmax(0,1fr)}
   .head h2{font-size:27px}
   .sheet-wrap{overflow:visible;border:0;background:none}
   table.sheet,.sheet tbody,.sheet tr,.sheet td{display:block;width:100%}
@@ -214,19 +231,44 @@ var TABS = [
      {k: 'status', l: 'Status', t: 'select', opts: ['To look at', 'Visited', 'Like', 'Top pick', 'No'], w: 130},
      {k: 'link', l: 'Link', t: 'url', w: 190},
      {k: 'notes', l: 'Notes', t: 'long', w: 280}]},
-  {key: 'rentals', label: 'Rentals', add: 'Add a rental',
-   blurb: 'Paste a listing link, fill in what matters, and move it along as you go.',
+  {key: 'rentals', label: 'Rentals', add: 'Add a rental', feed: true,
+   blurb: 'New rentals from the Zillow alerts wait at the top. Save keeps one in the list below, Pass sets it aside. Add a rental for one you find yourself.',
    sort: {k: 'status', dir: 1}, defaults: {status: 'New'},
+   liked: ['Like', 'Contacted', 'Toured', 'Applied'],
    cols: [
-     {k: 'address', l: 'Address', t: 'text', w: 210},
+     {k: 'address', l: 'Address', t: 'text', w: 270},
      {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
+     {k: 'search', l: 'School search', t: 'suggest', w: 210},
      {k: 'hood', l: 'Neighborhood', t: 'suggest', sugg: ['Willamette', 'Tanner Basin', 'Rosemont', 'Robinwood'], w: 150},
      {k: 'rent', l: 'Rent / mo', t: 'money', w: 120},
      {k: 'beds', l: 'Beds', t: 'num', w: 80},
      {k: 'baths', l: 'Baths', t: 'num', w: 80},
+     {k: 'sqft', l: 'Sq ft', t: 'num', w: 100},
+     {k: 'pets', l: 'Pets OK', t: 'check', w: 80},
      {k: 'available', l: 'Available', t: 'date', w: 150},
      {k: 'schools', l: 'Assigned schools', t: 'text', w: 200},
      {k: 'status', l: 'Status', t: 'select', opts: ['New', 'Like', 'Contacted', 'Toured', 'Applied', 'Passed'], w: 130},
+     {k: 'found', l: 'Found', t: 'date', w: 150},
+     {k: 'link', l: 'Link', t: 'url', w: 190},
+     {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
+  {key: 'buy', label: 'Houses to buy', add: 'Add a house', feed: true,
+   blurb: 'Houses for sale from the Zillow alerts. New ones wait at the top. Save keeps one in the list below, Pass sets it aside.',
+   sort: {k: 'status', dir: 1}, defaults: {status: 'New'},
+   liked: ['Like', 'Toured', 'Offer'],
+   cols: [
+     {k: 'address', l: 'Address', t: 'text', w: 270},
+     {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
+     {k: 'search', l: 'School search', t: 'suggest', w: 210},
+     {k: 'price', l: 'Price', t: 'money', w: 140},
+     {k: 'beds', l: 'Beds', t: 'num', w: 80},
+     {k: 'baths', l: 'Baths', t: 'num', w: 80},
+     {k: 'sqft', l: 'Sq ft', t: 'num', w: 100},
+     {k: 'status', l: 'Status', t: 'select', opts: ['New', 'Like', 'Toured', 'Offer', 'Passed'], w: 130},
+     {k: 'open', l: 'Open house', t: 'text', w: 220},
+     {k: 'cut', l: 'Price cut', t: 'text', w: 150},
+     {k: 'broker', l: 'Listed by', t: 'text', w: 210},
+     {k: 'schools', l: 'Assigned schools', t: 'text', w: 200},
+     {k: 'found', l: 'Found', t: 'date', w: 150},
      {k: 'link', l: 'Link', t: 'url', w: 190},
      {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
   {key: 'house', label: 'Selling the house', add: 'Add a task', tasks: true,
@@ -262,9 +304,13 @@ var TABS = [
 var TAB = {};
 TABS.forEach(function(t){ TAB[t.key] = t; });
 
-var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '',
+var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '', search: '',
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
          loadedAt: 0, saving: 0, saveErr: ''};
+
+// Homes loaded from the listing alerts. One still marked New waits in the tab's New list.
+var FEEDS = {zillow: 'Zillow'};
+function queued(r){ return !r.archived && !!FEEDS[r.source] && r.data.status === 'New'; }
 
 function $(sel, el){ return (el || document).querySelector(sel); }
 function esc(s){
@@ -324,8 +370,19 @@ var api = DEMO ? demoApi() : {
 function demoApi(){
   var me = 'demo@localhost', now = Date.now(), n = 0;
   function iso(h){ return new Date(now - h * 3600000).toISOString(); }
-  function mk(tab, data, h){ n++; return {id: 'demo-' + n, tab: tab, data: data, archived: false, source: 'page', ext_id: null, created_by: me, updated_by: me, created_at: iso(h), updated_at: iso(h)}; }
+  function mk(tab, data, h, src){
+    n++;
+    var by = src ? src + ' alert' : me;
+    return {id: 'demo-' + n, tab: tab, data: data, archived: false, source: src || 'page', ext_id: src ? tab + '-' + n : null, created_by: by, updated_by: by, created_at: iso(h), updated_at: iso(h)};
+  }
+  var found = today(), z = 'https://example.com/listing/';
   var rows = [
+    mk('rentals', {address: '101 Example St, Portland, OR', area: 'Mount Tabor area', search: 'Example Park School', rent: 2350, beds: 3, baths: 1, sqft: 1568, pets: true, status: 'New', found: found, link: z + '1'}, 2, 'zillow'),
+    mk('rentals', {address: '202 Sample Ave APT 4, Portland, OR', area: 'Mount Tabor area', search: 'Example Park School', rent: 2200, beds: 2, baths: 1, sqft: 942, pets: true, status: 'New', found: found, link: z + '2'}, 2, 'zillow'),
+    mk('rentals', {address: 'Address not shown, Portland, OR', area: 'Grant High area', search: 'Example High School', rent: 2995, beds: 3, baths: 3, sqft: 2246, status: 'New', found: found, link: z + '3'}, 2, 'zillow'),
+    mk('buy', {address: '303 Example Rd, West Linn, OR', area: 'West Linn', search: 'Example Middle School', price: 764900, beds: 4, baths: 3, sqft: 2264, status: 'New', open: 'Sun Oct 11, 12pm-2pm', broker: 'Example Realty', found: found, link: z + '4'}, 2, 'zillow'),
+    mk('buy', {address: '404 Sample Cir, West Linn, OR', area: 'West Linn', search: 'Example Middle School', price: 619500, beds: 4, baths: 2, sqft: 2073, status: 'New', cut: '$400 (9/17)', open: 'Fri Oct 9, 4pm-6pm / Sat Oct 10, 11am-1pm', broker: 'Sample Properties, LLC', found: found, link: z + '5'}, 2, 'zillow'),
+    mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Example High School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6'}, 30, 'zillow'),
     mk('timeline', {date: '2027-06-01', what: 'Example: move window opens', who: 'Both'}, 50),
     mk('timeline', {date: '2026-11-15', what: 'Example: settle the rent budget', who: 'Jeffrey', done: true}, 49),
     mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at'}, 40),
@@ -414,7 +471,7 @@ function renderApp(){
     '<header class="mast"><div class="wrap"><span class="brand">Portland move</span><div class="mast-r"><span class="who">' + esc(S.user.email) +
     '</span><button class="btn-w" data-act="signout">Sign out</button></div></div></header>' +
     '<section class="cover"><div class="wrap"><p class="eyebrow">Portland area · renting first</p><h1>Our move board</h1>' +
-    '<p class="sub">The timeline, schools, rentals, selling the Tucson house and moving logistics in one place, with the job search alongside.</p>' +
+    '<p class="sub">The timeline, schools, rentals, houses to buy, selling the Tucson house and moving logistics in one place, with the job search alongside.</p>' +
     '<div class="meta" id="meta"></div></div></section>' +
     '<nav class="tbar" aria-label="Board"><div class="wrap"><div class="tabs" role="tablist" id="tabs"></div></div></nav>' +
     '<main><div class="wrap" id="view"></div></main>';
@@ -431,12 +488,20 @@ function drawMeta(){
   var next = tl.filter(function(r){ return r.data.date && r.data.date >= t; })[0] || tl[0];
   var house = live('house').filter(function(r){ return !r.data.done; }).length;
   var logi = live('logistics').filter(function(r){ return !r.data.done; }).length;
-  var liked = live('rentals').filter(function(r){ return ['Like', 'Contacted', 'Toured', 'Applied'].indexOf(r.data.status) >= 0; }).length;
+  var liked = 0, toCheck = 0, saved = 0, homesTab = '';
+  TABS.forEach(function(t){
+    if (!t.feed) return;
+    live(t.key).forEach(function(r){
+      if (queued(r)){ toCheck++; if (!homesTab) homesTab = t.key; }
+      else saved++;
+      if (t.liked.indexOf(r.data.status) >= 0) liked++;
+    });
+  });
   var q = S.jobCounts ? S.jobCounts.queued : null;
   el.innerHTML =
     '<button data-go="timeline"><span class="k">Next on the timeline</span><b>' + esc(next ? (day(next.data.date) || 'No date') : 'Nothing yet') + '</b><span class="s">' + esc(next ? (next.data.what || '') : 'Add the first date') + '</span></button>' +
     '<button data-go="' + (house || !logi ? 'house' : 'logistics') + '"><span class="k">Open to-dos</span><b>' + (house + logi) + '</b><span class="s">' + house + ' house · ' + logi + ' logistics</span></button>' +
-    '<button data-go="rentals"><span class="k">Rentals you like</span><b>' + liked + '</b><span class="s">' + live('rentals').length + ' saved in all</span></button>' +
+    '<button data-go="' + (homesTab || 'rentals') + '"><span class="k">Homes you like</span><b>' + liked + '</b><span class="s">' + (toCheck ? toCheck + ' new to check' : saved + ' saved in all') + '</span></button>' +
     '<button data-go="jobs"><span class="k">Jobs in the queue</span><b>' + (q == null ? '…' : q) + '</b><span class="s">From the job scan</span></button>';
 }
 
@@ -458,7 +523,7 @@ function drawTabs(){
 
 function goTab(key){
   if (!TAB[key]) return;
-  S.tab = key; S.q = ''; S.fresh = {};
+  S.tab = key; S.q = ''; S.search = ''; S.fresh = {};
   history.replaceState(null, '', '#' + key);
   drawTabs(); drawView();
   var bar = $('.tbar');
@@ -472,12 +537,15 @@ function colOf(t, k){ return t.cols.filter(function(c){ return c.k === k; })[0];
 
 function drawSheetView(){
   var t = TAB[S.tab];
+  var searches = hasCol(t, 'search') ? valuesOf(t.key, 'search') : [];
   $('#view').innerHTML =
     '<div class="head"><h2>' + esc(t.label) + '</h2><span class="save" id="save" role="status"></span></div>' +
     '<p class="blurb">' + esc(t.blurb) + '</p>' +
     '<div class="tools"><input type="search" id="q" placeholder="Search this tab" aria-label="Search this tab" value="' + esc(S.q) + '">' +
     (hasCol(t, 'area') ? '<select id="area" aria-label="Area"><option value="">All areas</option>' +
       AREAS.map(function(a){ return '<option' + (a === S.area ? ' selected' : '') + '>' + esc(a) + '</option>'; }).join('') + '</select>' : '') +
+    (searches.length ? '<select id="srch" aria-label="School search"><option value="">All school searches</option>' +
+      searches.map(function(v){ return '<option' + (v === S.search ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select>' : '') +
     (t.tasks ? '<label class="tg"><input type="checkbox" id="hideDone"' + (S.hideDone ? ' checked' : '') + '> Hide done</label>' : '') +
     '<label class="tg"><input type="checkbox" id="showArch"' + (S.showArch ? ' checked' : '') + '> Show archived</label>' +
     '<span class="sp"></span><button class="btn quiet small" data-act="csv">Download CSV</button>' +
@@ -486,19 +554,38 @@ function drawSheetView(){
   drawSave(); drawSheet();
 }
 
+function valuesOf(tab, k){
+  var out = [];
+  S.rows.forEach(function(r){ var v = r.data[k]; if (r.tab === tab && v && typeof v === 'string' && out.indexOf(v) < 0) out.push(v); });
+  return out.sort(function(a, b){ return a.localeCompare(b); });
+}
+
+// the search box and the Area and School search filters
+function matches(t, r){
+  var q = S.q.trim().toLowerCase();
+  if (hasCol(t, 'area') && S.area && r.data.area !== S.area) return false;
+  if (hasCol(t, 'search') && S.search && r.data.search !== S.search) return false;
+  if (q){
+    var hay = Object.keys(r.data).map(function(k){ return r.data[k]; }).join(' ').toLowerCase();
+    if (hay.indexOf(q) < 0) return false;
+  }
+  return true;
+}
+
+// the New list: alert homes nobody has saved or passed yet, newest first
+function queueRows(t){
+  if (!t.feed) return [];
+  return S.rows.filter(function(r){ return r.tab === t.key && queued(r) && matches(t, r); })
+    .sort(function(a, b){ return (b.data.found || '').localeCompare(a.data.found || '') || (a.created_at < b.created_at ? -1 : 1); });
+}
+
 function visibleRows(t){
-  var q = S.q.trim().toLowerCase(), area = hasCol(t, 'area') ? S.area : '';
   var rows = S.rows.filter(function(r){
-    if (r.tab !== t.key) return false;
+    if (r.tab !== t.key || queued(r)) return false;
     if (S.fresh[r.id]) return true;
     if (r.archived && !S.showArch) return false;
     if (t.tasks && S.hideDone && r.data.done) return false;
-    if (area && r.data.area !== area) return false;
-    if (q){
-      var hay = Object.keys(r.data).map(function(k){ return r.data[k]; }).join(' ').toLowerCase();
-      if (hay.indexOf(q) < 0) return false;
-    }
-    return true;
+    return matches(t, r);
   });
   var s = S.sort[t.key] || t.sort, col = colOf(t, s.k);
   rows.sort(function(a, b){
@@ -529,13 +616,20 @@ function cmp(col, k, dir, a, b){
 
 function drawSheet(){
   var t = TAB[S.tab], box = $('#sheet'); if (!box) return;
-  var rows = visibleRows(t), any = S.rows.some(function(r){ return r.tab === t.key; });
+  var rows = visibleRows(t), fresh = queueRows(t);
+  var any = S.rows.some(function(r){ return r.tab === t.key && !queued(r); });
   var s = S.sort[t.key] || t.sort;
-  var h;
+  var h = '';
+  if (fresh.length){
+    h += '<section class="queue" aria-label="New listings"><div class="qh"><h3>New from the alerts</h3><span class="c">' + fresh.length + '</span></div>' +
+      '<div class="qgrid">' + fresh.map(function(r){ return listingCard(t, r); }).join('') + '</div></section>' +
+      '<h3 class="lh">Your list</h3>';
+  }
   if (!rows.length){
-    h = '<div class="empty">' + (any ? 'Nothing matches. Clear the search or filters to see every row.' : 'Nothing here yet. Add the first row below.') + '</div>';
+    h += '<div class="empty">' + (any ? 'Nothing matches. Clear the search or filters to see every row.'
+      : t.feed ? 'Nothing saved yet. Save a new listing' + (fresh.length ? ' above' : '') + ', or add one below.' : 'Nothing here yet. Add the first row below.') + '</div>';
   } else {
-    h = '<div class="sheet-wrap"><table class="sheet"><thead><tr>' + t.cols.map(function(c){
+    h += '<div class="sheet-wrap"><table class="sheet"><thead><tr>' + t.cols.map(function(c){
       var on = s.k === c.k;
       return '<th style="min-width:' + (c.w || 120) + 'px" aria-sort="' + (on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + c.k + '">' +
         esc(c.l) + (on ? ' <span class="arr">' + (s.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</button></th>';
@@ -656,6 +750,7 @@ async function saveCell(id, k, v){
 async function addRow(){
   var t = TAB[S.tab], data = Object.assign({}, t.defaults || {});
   if (S.area && hasCol(t, 'area')) data.area = S.area;
+  if (S.search && hasCol(t, 'search')) data.search = S.search;
   try {
     S.saving++; S.saveErr = ''; drawSave();
     var r = await api.add(t.key, S.user.email, data);
@@ -677,10 +772,59 @@ async function setArchived(id, flag){
   if (flag) toast('Row archived.', function(){ setArchived(id, false); });
 }
 
+/* ---------- the New list (homes from the alerts) ---------- */
+
+function money(v){ return v == null || v === '' || isNaN(Number(v)) ? '' : '$' + Number(v).toLocaleString('en-US'); }
+
+function listingCard(t, r){
+  var d = r.data, u = safeUrl(d.link), rent = t.key === 'rentals';
+  var price = money(rent ? d.rent : d.price);
+  var facts = [price ? price + (rent ? '/mo' : '') : '', d.beds != null && d.beds !== '' ? d.beds + ' bd' : '',
+    d.baths != null && d.baths !== '' ? d.baths + ' ba' : '', d.sqft ? Number(d.sqft).toLocaleString('en-US') + ' sq ft' : '', d.pets ? 'pets OK' : ''];
+  var more = [d.search ? d.search + ' search' : '', d.found ? 'found ' + day(d.found) : '', d.broker || ''];
+  return '<article class="job lst" data-lid="' + esc(r.id) + '"><h3>' +
+    (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(d.address || 'No address') + '</a>' : esc(d.address || 'No address')) + '</h3>' +
+    '<p class="lp">' + facts.filter(Boolean).map(esc).join(' · ') + '</p>' +
+    (d.open ? '<p class="lx"><span class="pill">Open house</span> ' + esc(d.open) + '</p>' : '') +
+    (d.cut ? '<p class="lx"><span class="pill">Price cut</span> ' + esc(d.cut) + '</p>' : '') +
+    '<p class="jm">' + more.filter(Boolean).map(esc).join(' · ') + '</p>' +
+    '<div class="acts"><button class="btn small primary" data-list="save">Save</button><button class="btn small quiet" data-list="pass">Pass</button>' +
+    (u ? '<a class="btn small quiet" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open on ' + esc(FEEDS[r.source] || 'the site') + '</a>' : '') +
+    '</div></article>';
+}
+
+// Save keeps a home (status Like, so it moves to the list below). Pass sets it to
+// Passed and archives it. Both can be undone, and both go through mutate like any edit.
+async function listAction(id, act){
+  var before = null;
+  try {
+    await mutate(id, function(cur){
+      before = {status: cur.data.status, archived: cur.archived};
+      var d = Object.assign({}, cur.data, {status: act === 'save' ? 'Like' : 'Passed'});
+      return act === 'save' ? {data: d} : {data: d, archived: true};
+    });
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); drawSheet(); return; }
+  if (act === 'save') S.fresh[id] = Date.now();
+  drawSheet(); drawTabs(); drawMeta();
+  toast(act === 'save' ? 'Saved. It’s in the list below.' : 'Passed. Show archived brings it back.', function(){ undoListAction(id, before); });
+}
+
+async function undoListAction(id, before){
+  try {
+    await mutate(id, function(cur){
+      var d = Object.assign({}, cur.data);
+      if (before.status) d.status = before.status; else delete d.status;
+      return {data: d, archived: !!before.archived};
+    });
+  } catch (e){ return; }
+  delete S.fresh[id];
+  drawSheet(); drawTabs(); drawMeta();
+}
+
 /* ---------- CSV ---------- */
 
 function downloadCsv(){
-  var t = TAB[S.tab], rows = visibleRows(t);
+  var t = TAB[S.tab], rows = queueRows(t).concat(visibleRows(t));
   function q(v){ v = v == null ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   var lines = [t.cols.map(function(c){ return c.l; }).concat(['Last edited by', 'Last edited'])];
   rows.forEach(function(r){
@@ -807,6 +951,11 @@ document.addEventListener('click', async function(e){
     jobAction(Number(b.dataset.id), b.dataset.job, card ? card.dataset.status : null); return;
   }
   if (b.dataset.opp){ b.disabled = true; oppAction(Number(b.dataset.id), b.dataset.opp); return; }
+  if (b.dataset.list){
+    var lc = b.closest('[data-lid]'); if (!lc) return;
+    lc.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
+    listAction(lc.dataset.lid, b.dataset.list); return;
+  }
   var act = b.dataset.act; if (!act) return;
   if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
   if (act === 'add'){ addRow(); return; }
@@ -819,6 +968,7 @@ document.addEventListener('click', async function(e){
 document.addEventListener('change', function(e){
   var el = e.target;
   if (el.id === 'area'){ S.area = el.value; drawSheet(); return; }
+  if (el.id === 'srch'){ S.search = el.value; drawSheet(); return; }
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
   var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id]');
