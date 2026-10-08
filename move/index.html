@@ -20,6 +20,9 @@
   list at the top of the tab: Save sets them to Like, Pass archives them. The Map tab
   shows them as pins (positions from the Census geocoder, kept in data._lat, _lon and
   _geo by the same script) with the six schools, on the LSRI lab's live map.
+  Jobs: Applied lists the jobs marked applied, each with a result (Waiting to hear,
+  Interview, Offer, Passed over), the date applied and a note. Those live in move_rows
+  (tab 'applications', ext_id 'job-<id>'), so the job scan never touches them.
   Same look as the Oregon Sound Circuit notebook. Local preview with demo data:
   http://localhost:PORT/move/?demo (localhost only, nothing is saved).
 -->
@@ -251,6 +254,19 @@ table.sheet{border-collapse:collapse;width:100%}
 .lnk{background:none;border:0;padding:0;font:inherit;color:var(--teal-t);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
 .job.hl{outline:2.5px solid var(--teal);outline-offset:2px}
 
+/* jobs you applied to */
+.appsum{color:var(--slate);margin:0 0 12px;font-size:15px}
+.appf{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:4px 0 12px}
+.appf label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.appf label>span{font:500 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.appf select,.appf input{border:1.5px solid var(--line2);border-radius:8px;padding:6px 9px;font-size:15px;background:#fff;color:var(--ink)}
+.appf .grow{flex:1 1 280px}
+.appf .grow input{width:100%}
+.o-interview .appf select{background:var(--teal-tint);border-color:#9FCFD2;color:var(--teal-t);font-weight:600}
+.o-offer .appf select{background:#E7F3E3;border-color:#A9CF9D;color:#2F6B22;font-weight:600}
+.job.o-passed-over{background:var(--mist)}
+.job.o-passed-over h3 a{color:var(--slate)}
+
 /* undo toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
 .toast button{background:none;border:1.5px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font-weight:600;cursor:pointer}
@@ -434,7 +450,7 @@ var TAB = {};
 TABS.forEach(function(t){ TAB[t.key] = t; });
 
 var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, editing: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
-         hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
+         hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null, jobQ: '',
          loadedAt: 0, saving: 0, saveErr: ''};
 
 // Homes loaded from the listing alerts. One still marked New waits in the tab's New list.
@@ -466,6 +482,7 @@ function must(r){ if (r.error) throw r.error; return r.data; }
 
 /* ---------- data ---------- */
 
+var JOB_COLS = 'id,employer_name,title,location,salary_min,salary_max,salary_raw,status,canonical_url,first_seen,updated_at';
 var api = DEMO ? demoApi() : {
   session: async function(){ var r = await sb.auth.getSession(); return r.data && r.data.session ? r.data.session.user : null; },
   signIn: async function(email, pass){ var r = await sb.auth.signInWithPassword({email: email, password: pass}); if (r.error) throw r.error; return r.data.user; },
@@ -476,9 +493,16 @@ var api = DEMO ? demoApi() : {
   add: async function(tab, me, data){ return must(await sb.from('move_rows').insert({tab: tab, data: data || {}, created_by: me, updated_by: me}).select().single()); },
   version: async function(row, me){ must(await sb.from('move_versions').insert({row_id: row.id, data: row.data, archived: row.archived, saved_by: me})); },
   update: async function(id, body){ return must(await sb.from('move_rows').update(body).eq('id', id).select().single()); },
-  jobs: async function(statuses, limit){
-    return must(await sb.from('jobs').select('id,employer_name,title,location,salary_min,salary_max,salary_raw,status,canonical_url,first_seen')
-      .in('status', statuses).order('first_seen', {ascending: false}).limit(limit));
+  jobs: async function(statuses, limit, order){
+    return must(await sb.from('jobs').select(JOB_COLS).in('status', statuses).order(order || 'first_seen', {ascending: false}).limit(limit));
+  },
+  findJobs: async function(status, q, limit){
+    q = q.replace(/[,()*%\\"]/g, ' ').trim();
+    return must(await sb.from('jobs').select(JOB_COLS).eq('status', status)
+      .or('title.ilike.*' + q + '*,employer_name.ilike.*' + q + '*').order('updated_at', {ascending: false}).limit(limit));
+  },
+  addExt: async function(tab, me, data, source, ext){
+    return must(await sb.from('move_rows').insert({tab: tab, data: data || {}, source: source, ext_id: ext, created_by: me, updated_by: me}).select().single());
   },
   jobCount: async function(statuses){
     var r = await sb.from('jobs').select('id', {count: 'exact', head: true}).in('status', statuses);
@@ -527,8 +551,12 @@ function demoApi(){
   var jobs = [
     {id: 1, employer_name: 'Example County', title: 'Example Policy Analyst', location: 'Vancouver, WA', salary_min: 85000, salary_max: 110000, status: 'queued', canonical_url: 'https://example.com/job/1', first_seen: iso(3)},
     {id: 2, employer_name: 'Example Foundation', title: 'Example Program Evaluation Manager', location: 'Remote', salary_raw: '$95,000 - $120,000 Annually', status: 'queued', canonical_url: 'https://example.com/job/2', first_seen: iso(8)},
-    {id: 3, employer_name: 'Example City', title: 'Example Research Analyst', location: 'Portland, OR', status: 'applied', canonical_url: 'https://example.com/job/3', first_seen: iso(90)}
+    {id: 3, employer_name: 'Example City', title: 'Example Research Analyst', location: 'Portland, OR', status: 'applied', canonical_url: 'https://example.com/job/3', first_seen: iso(90), updated_at: iso(80)},
+    {id: 4, employer_name: 'Example State Agency', title: 'Example Program Analyst 3', location: 'Salem, OR', salary_min: 70000, salary_max: 95000, status: 'applied', canonical_url: 'https://example.com/job/4', first_seen: iso(200), updated_at: iso(70)},
+    {id: 5, employer_name: 'Example Nonprofit', title: 'Example Grants Coordinator', location: 'Portland, OR', status: 'user_rejected', canonical_url: 'https://example.com/job/5', first_seen: iso(60), updated_at: iso(5)},
+    {id: 6, employer_name: 'Example County', title: 'Example Budget Analyst', location: 'Hillsboro, OR', status: 'user_rejected', canonical_url: 'https://example.com/job/6', first_seen: iso(50), updated_at: iso(4)}
   ];
+  rows.push((function(){ var r = mk('applications', {job_id: 3, applied_on: '2026-09-20', outcome: 'Passed over', note: 'Example: the job site says no longer under consideration.'}, 70); r.source = 'jobs'; r.ext_id = 'job-3'; return r; })());
   var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', description: 'Demo opportunity.'}];
   function copy(v){ return new Promise(function(res){ setTimeout(function(){ res(JSON.parse(JSON.stringify(v))); }, 120); }); }
   function find(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
@@ -542,9 +570,18 @@ function demoApi(){
     add: async function(tab, who, data){ var r = mk(tab, data || {}, 0); r.created_at = r.updated_at = new Date().toISOString(); rows.push(r); return copy(r); },
     version: async function(){},
     update: async function(id, body){ var r = find(id); Object.assign(r, JSON.parse(JSON.stringify(body)), {updated_at: new Date().toISOString()}); return copy(r); },
-    jobs: async function(st){ return copy(jobs.filter(function(j){ return st.indexOf(j.status) >= 0; })); },
+    jobs: async function(st, limit, order){
+      var l = jobs.filter(function(j){ return st.indexOf(j.status) >= 0; });
+      if (order === 'updated_at') l.sort(function(a, b){ return (b.updated_at || '').localeCompare(a.updated_at || ''); });
+      return copy(l);
+    },
+    findJobs: async function(st, q){ q = q.toLowerCase(); return copy(jobs.filter(function(j){ return j.status === st && (j.title + ' ' + j.employer_name).toLowerCase().indexOf(q) >= 0; })); },
+    addExt: async function(tab, who, data, src, ext){
+      if (rows.some(function(r){ return r.source === src && r.ext_id === ext; })) throw {code: '23505', message: 'duplicate key'};
+      var r = mk(tab, data || {}, 0); r.source = src; r.ext_id = ext; r.created_at = r.updated_at = new Date().toISOString(); rows.push(r); return copy(r);
+    },
     jobCount: async function(st){ return jobs.filter(function(j){ return st.indexOf(j.status) >= 0; }).length; },
-    setJob: async function(id, s){ jobs.filter(function(j){ return j.id === id; })[0].status = s; },
+    setJob: async function(id, s){ var j = jobs.filter(function(x){ return x.id === id; })[0]; j.status = s; j.updated_at = new Date().toISOString(); },
     opps: async function(){ return copy(opps.filter(function(o){ return ['new', 'watch', 'pursue'].indexOf(o.status) >= 0; })); },
     oppCount: async function(){ return opps.filter(function(o){ return ['new', 'watch', 'pursue'].indexOf(o.status) >= 0; }).length; },
     setOpp: async function(id, s){ opps.filter(function(o){ return o.id === id; })[0].status = s; }
@@ -634,7 +671,7 @@ function drawMeta(){
     '<button data-go="timeline"><span class="k">Next on the timeline</span><b>' + esc(next ? (day(next.data.date) || 'No date') : 'Nothing yet') + '</b><span class="s">' + esc(next ? (next.data.what || '') : 'Add the first date') + '</span></button>' +
     '<button data-go="' + (house || !logi ? 'house' : 'logistics') + '"><span class="k">Open to-dos</span><b>' + (house + logi) + '</b><span class="s">' + house + ' house · ' + logi + ' logistics</span></button>' +
     '<button data-go="' + (homesTab || 'rentals') + '"><span class="k">Homes you like</span><b>' + liked + '</b><span class="s">' + (toCheck ? toCheck + ' new to check' : saved + ' saved in all') + '</span></button>' +
-    '<button data-go="jobs"><span class="k">Jobs in the queue</span><b>' + (q == null ? '…' : q) + '</b><span class="s">From the job scan</span></button>';
+    '<button data-go="jobs"><span class="k">Jobs in the queue</span><b>' + (q == null ? '…' : q) + '</b><span class="s">' + esc(jobsLine()) + '</span></button>';
 }
 
 function tabCount(t){
@@ -1375,39 +1412,130 @@ function downloadCsv(){
 
 async function loadJobCounts(){
   try {
-    var c = await Promise.all([api.jobCount(['queued']), api.jobCount(['applied', 'user_rejected']), api.oppCount()]);
-    S.jobCounts = {queued: c[0], decided: c[1], opps: c[2]};
+    var c = await Promise.all([api.jobCount(['queued']), api.jobCount(['applied']), api.jobCount(['user_rejected']), api.oppCount()]);
+    S.jobCounts = {queued: c[0], applied: c[1], passed: c[2], opps: c[3]};
   } catch (e){ S.jobCounts = null; }
   drawMeta(); drawTabs(); drawJobChips();
 }
 
+function jobsLine(){
+  var c = S.jobCounts;
+  if (!c || !c.applied) return 'From the job scan';
+  var iv = S.rows.filter(function(r){ return r.tab === 'applications' && !r.archived && r.data.outcome === 'Interview'; }).length;
+  return c.applied + ' applied' + (iv ? ' · ' + iv + ' interview' + (iv > 1 ? 's' : '') : '');
+}
+
 function drawJobs(){
   $('#view').innerHTML = '<div class="head"><h2>Jobs</h2></div>' +
-    '<p class="blurb">The job scan’s queue. Applied or Pass moves a job to Decided. Opportunities are grants and other leads.</p>' +
-    '<div class="chips" id="jchips"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
-  drawJobChips(); loadJobList();
+    '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads.</p>' +
+    '<div class="chips" id="jchips"></div><div id="jtools"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
+  drawJobChips(); drawJobTools(); loadJobList();
 }
 
 function drawJobChips(){
   var el = $('#jchips'); if (!el) return;
   var c = S.jobCounts || {};
-  el.innerHTML = [['queued', 'Queued', c.queued], ['decided', 'Decided', c.decided], ['opps', 'Opportunities', c.opps]].map(function(x){
+  el.innerHTML = [['queued', 'Queued', c.queued], ['applied', 'Applied', c.applied], ['passed', 'Passed', c.passed], ['opps', 'Opportunities', c.opps]].map(function(x){
     return '<button class="chip' + (S.jobsView === x[0] ? ' on' : '') + '" data-jview="' + x[0] + '">' + x[1] +
       (x[2] != null ? '<span class="c">' + x[2] + '</span>' : '') + '</button>';
   }).join('');
 }
 
+// the search box only shows on Passed; it's drawn once so typing keeps the cursor
+function drawJobTools(){
+  var el = $('#jtools'); if (!el) return;
+  if (S.jobsView !== 'passed'){ el.innerHTML = ''; return; }
+  if (!$('#jq', el)) el.innerHTML = '<div class="tools"><input type="search" id="jq" placeholder="Find a job you passed: title or employer" aria-label="Find a passed job" value="' + esc(S.jobQ) + '"></div>';
+}
+
 async function loadJobList(){
   var view = S.jobsView, el = $('#jlist');
   try {
-    var list = view === 'opps' ? await api.opps()
-      : await api.jobs(view === 'queued' ? ['queued'] : ['applied', 'user_rejected'], view === 'queued' ? 200 : 100);
+    var list;
+    if (view === 'opps') list = await api.opps();
+    else if (view === 'applied') list = await api.jobs(['applied'], 300);
+    else if (view === 'passed') list = S.jobQ.trim() ? await api.findJobs('user_rejected', S.jobQ, 100) : await api.jobs(['user_rejected'], 100, 'updated_at');
+    else list = await api.jobs(['queued'], 200);
     if (S.tab !== 'jobs' || S.jobsView !== view || !$('#jlist')) return;
     el = $('#jlist');
-    if (!list.length){ el.innerHTML = '<div class="empty">' + (view === 'queued' ? 'The queue is empty. Run jobscan to look for new postings.' : 'Nothing here.') + '</div>'; return; }
-    el.innerHTML = list.map(view === 'opps' ? oppCard : jobCard).join('');
+    if (!list.length){
+      el.innerHTML = '<div class="empty">' + (view === 'queued' ? 'The queue is empty. Run jobscan to look for new postings.'
+        : view === 'passed' && S.jobQ.trim() ? 'No passed job matches that.' : 'Nothing here.') + '</div>';
+      return;
+    }
+    if (view === 'applied'){ el.innerHTML = '<p class="appsum" id="appsum"></p>' + sortApplied(list).map(appliedCard).join(''); drawAppSum(); return; }
+    el.innerHTML = (view === 'passed' ? '<p class="appsum">' + (S.jobQ.trim() ? 'Matching passed jobs, most recently passed first.' : 'The last 100 you passed, most recent first. Search for older ones.') + '</p>' : '') +
+      list.map(view === 'opps' ? oppCard : jobCard).join('');
   } catch (e){
     if ($('#jlist')) $('#jlist').innerHTML = '<div class="err">Could not load the jobs: ' + esc(e.message || e) + '</div>';
+  }
+}
+
+/* ---------- jobs you applied to ---------- */
+
+var OUTCOMES = ['Waiting to hear', 'Interview', 'Offer', 'Passed over'];
+function appFor(jobId){ return S.rows.filter(function(r){ return r.tab === 'applications' && r.ext_id === 'job-' + jobId; })[0]; }
+function outcomeOf(jobId){ var a = appFor(jobId); return (a && a.data.outcome) || 'Waiting to hear'; }
+function oslug(o){ return String(o).toLowerCase().replace(/[^a-z]+/g, '-'); }
+
+// interviews and offers first, then waiting, then passed over; newest application first within each
+function sortApplied(list){
+  var rank = {'Interview': 0, 'Offer': 1, 'Waiting to hear': 2, 'Passed over': 3};
+  return list.slice().sort(function(a, b){
+    var ra = rank[outcomeOf(a.id)], rb = rank[outcomeOf(b.id)];
+    if (ra !== rb) return ra - rb;
+    var da = (appFor(a.id) || {data: {}}).data.applied_on || '', db = (appFor(b.id) || {data: {}}).data.applied_on || '';
+    return db.localeCompare(da);
+  });
+}
+
+function drawAppSum(){
+  var el = $('#appsum'); if (!el) return;
+  var cards = document.querySelectorAll('.job.app'), n = {};
+  cards.forEach(function(c){ var o = outcomeOf(Number(c.dataset.card)); n[o] = (n[o] || 0) + 1; });
+  el.textContent = cards.length + ' applied: ' + OUTCOMES.filter(function(o){ return n[o]; }).map(function(o){ return n[o] + ' ' + o.toLowerCase(); }).join(', ') + '.';
+}
+
+function appliedCard(j){
+  var a = appFor(j.id), d = a ? a.data : {}, out = d.outcome || 'Waiting to hear', u = safeUrl(j.canonical_url);
+  var meta = [j.employer_name, j.location || 'location unlisted', fmtSalary(j)].filter(Boolean).map(esc).join(' · ');
+  var at = ' data-job-id="' + j.id + '"';
+  return '<article class="job app o-' + oslug(out) + '" data-card="' + j.id + '" data-status="applied"><h3>' +
+    (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) + '</h3><p class="jm">' + meta + '</p>' +
+    '<div class="appf"><label><span>Result</span><select data-app="outcome"' + at + '>' + OUTCOMES.map(function(o){
+      return '<option' + (o === out ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></label>' +
+    '<label><span>Applied</span><input type="date" data-app="applied_on"' + at + ' value="' + esc(d.applied_on || '') + '"></label>' +
+    '<label class="grow"><span>Note</span><input type="text" data-app="note"' + at + ' value="' + esc(d.note || '') + '" placeholder="Interview date, who you talked to, the job number"></label></div>' +
+    '<div class="acts"><button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button></div></article>';
+}
+
+// A result, date or note saves to the job's record in move_rows, made the first time it's needed.
+async function saveApp(jobId, k, v, retried){
+  var a = appFor(jobId);
+  try {
+    if (a) {
+      await mutate(a.id, function(cur){
+        var d = Object.assign({}, cur.data);
+        if (v === '' || v == null) delete d[k]; else d[k] = v;
+        return {data: d, archived: false};
+      });
+    } else {
+      var d = {job_id: jobId};
+      if (v !== '' && v != null) d[k] = v;
+      S.rows.push(await api.addExt('applications', S.user.email, d, 'jobs', 'job-' + jobId));
+    }
+  } catch (e){
+    if (!a && !retried && e && (e.code === '23505' || /duplicate/i.test(e.message || ''))){
+      S.rows = await api.rows();                       // the other person just made it: load it and save again
+      return saveApp(jobId, k, v, true);
+    }
+    toast('Could not save: ' + ((e && e.message) || 'check the connection and try again'));
+    return;
+  }
+  if (k === 'outcome'){
+    var card = document.querySelector('.job.app[data-card="' + jobId + '"]');
+    if (card) card.className = 'job app o-' + oslug(v || 'Waiting to hear');
+    drawAppSum(); drawMeta();
   }
 }
 
@@ -1422,7 +1550,8 @@ function jobCard(j){
   var pill = j.status === 'applied' ? '<span class="pill">Applied</span> ' : j.status === 'user_rejected' ? '<span class="pill">Passed</span> ' : '';
   var acts = j.status === 'queued'
     ? '<button class="btn small primary" data-job="applied" data-id="' + j.id + '">Applied</button><button class="btn small quiet" data-job="user_rejected" data-id="' + j.id + '">Pass</button>'
-    : '<button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button>';
+    : (j.status === 'user_rejected' ? '<button class="btn small primary" data-job="applied" data-id="' + j.id + '">Mark applied</button>' : '') +
+      '<button class="btn small quiet" data-job="queued" data-id="' + j.id + '">Back to the queue</button>';
   return '<article class="job" data-card="' + j.id + '" data-status="' + esc(j.status) + '"><h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(j.title) + '</a>' : esc(j.title)) +
     '</h3><p class="jm">' + pill + meta + '</p><div class="acts">' + acts + '</div></article>';
 }
@@ -1440,6 +1569,7 @@ function oppCard(o){
 
 async function jobAction(id, status, prev){
   try { await api.setJob(id, status); } catch (e){ toast('Could not save: ' + (e.message || e)); return; }
+  if (status === 'applied'){ var a = appFor(id); if (!a || !a.data.applied_on) saveApp(id, 'applied_on', today()); }
   var card = document.querySelector('[data-card="' + id + '"]'); if (card) card.remove();
   var words = {applied: 'Marked applied.', user_rejected: 'Passed.', queued: 'Back in the queue.'};
   toast(words[status] || 'Saved.', prev ? function(){ jobAction(id, prev, null).then(loadJobList); } : null);
@@ -1476,7 +1606,7 @@ document.addEventListener('click', async function(e){
     S.sort[t.key] = {k: b.dataset.sort, dir: s.k === b.dataset.sort ? -s.dir : 1};
     drawSheet(); return;
   }
-  if (b.dataset.jview){ S.jobsView = b.dataset.jview; drawJobChips(); $('#jlist').innerHTML = '<p class="blurb">Loading…</p>'; loadJobList(); return; }
+  if (b.dataset.jview){ S.jobsView = b.dataset.jview; drawJobChips(); drawJobTools(); $('#jlist').innerHTML = '<p class="blurb">Loading…</p>'; loadJobList(); return; }
   if (b.dataset.job){
     var card = b.closest('[data-card]');
     b.disabled = true;
@@ -1528,6 +1658,7 @@ document.addEventListener('change', function(e){
   if (el.id === 'mapSchools'){ S.mapSchools = el.checked; drawPins(false); return; }
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
+  if (el.dataset && el.dataset.app){ saveApp(Number(el.dataset.jobId), el.dataset.app, el.value.trim()); return; }
   var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id], .sc[data-id], .detail[data-id]');
   if (!k || !tr) return;
   var c = colOf(TAB[S.tab], k), v;
@@ -1547,8 +1678,10 @@ document.addEventListener('focusout', function(e){
   if (el.tagName === 'TEXTAREA') setTimeout(function(){ if (document.body.contains(el)) grow(el); }, 0);
 });
 
+var jqTimer;
 document.addEventListener('input', function(e){
   if (e.target.tagName === 'TEXTAREA') grow(e.target);
+  if (e.target.id === 'jq'){ S.jobQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(loadJobList, 300); }
   if (e.target.id === 'q'){
     S.q = e.target.value;
     clearTimeout(qTimer); qTimer = setTimeout(drawSheet, 150);
