@@ -125,6 +125,9 @@ table.sheet{border-collapse:collapse;width:100%}
 .sheet input[type=checkbox]{width:20px;height:20px;accent-color:var(--teal);margin:8px;flex:none}
 .sheet .cur{color:var(--slate);padding-left:6px}
 .sheet .open{font-size:13.5px;font-weight:600;white-space:nowrap;padding:0 6px}
+.cv.cvl{flex-direction:column;align-items:stretch;gap:0}
+.tl{display:flex;flex-wrap:wrap;gap:2px 12px;padding:0 9px 5px;font-size:13.5px;font-weight:600}
+.tl a{white-space:nowrap}
 .sheet td.rt{white-space:nowrap;text-align:right;vertical-align:middle;padding-right:8px}
 .edited{display:block;font:500 12px/1.3 var(--mono);color:var(--ink3);letter-spacing:.03em}
 .sheet tr.done td{background:#F7F4EE}
@@ -279,7 +282,7 @@ var TABS = [
      {k: 'done', l: 'Done', t: 'check', w: 70},
      {k: 'notes', l: 'Notes', t: 'long', w: 300}]},
   {key: 'schools', label: 'Schools', add: 'Add a school',
-   blurb: 'Schools to look at. For a rental, check which schools the address is assigned to with the district’s own school finder.',
+   blurb: 'The schools behind your searches, with how to enroll, who to call or email, and the dates that matter. Before you rent or buy, put the address into Check an address to see which schools it’s assigned to.',
    sort: {k: 'area', dir: 1}, defaults: {status: 'To look at'},
    cols: [
      {k: 'school', l: 'School', t: 'text', w: 220},
@@ -287,7 +290,14 @@ var TABS = [
      {k: 'district', l: 'District', t: 'suggest', sugg: ['West Linn-Wilsonville School District', 'Sherwood School District', 'Portland Public Schools'], w: 230},
      {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
      {k: 'status', l: 'Status', t: 'select', opts: ['To look at', 'Visited', 'Like', 'Top pick', 'No'], w: 130},
-     {k: 'link', l: 'Link', t: 'url', w: 190},
+     {k: 'link', l: 'Website', t: 'url', w: 190},
+     {k: 'address', l: 'Address', t: 'text', w: 240},
+     {k: 'phone', l: 'Main office', t: 'text', w: 150},
+     {k: 'email', l: 'Email', t: 'long', w: 240},
+     {k: 'enroll', l: 'How to enroll', t: 'url', w: 190},
+     {k: 'finder', l: 'Check an address', t: 'url', w: 190},
+     {k: 'dates', l: 'Key dates', t: 'long', w: 340},
+     {k: 'visit', l: 'Tours and visits', t: 'long', w: 300},
      {k: 'notes', l: 'Notes', t: 'long', w: 280}]},
   {key: 'rentals', label: 'Rentals', add: 'Add a rental', feed: true,
    blurb: 'New rentals from the Zillow alerts wait at the top. Save keeps one in the list below, Pass sets it aside. Add a rental for one you find yourself.',
@@ -444,7 +454,10 @@ function demoApi(){
     mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Beaumont Middle School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6', _lat: 45.5521, _lon: -122.6188, _geo: '505 Example Dr, Portland, OR'}, 30, 'zillow'),
     mk('timeline', {date: '2027-06-01', what: 'Example: move window opens', who: 'Both'}, 50),
     mk('timeline', {date: '2026-11-15', what: 'Example: settle the rent budget', who: 'Jeffrey', done: true}, 49),
-    mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at'}, 40),
+    mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at',
+      link: 'https://example.com/school', address: '1 Example Ave, Portland, OR', phone: '503-555-0100', email: 'office@example.com',
+      enroll: 'https://example.com/enroll', finder: 'https://example.com/finder',
+      dates: 'Example: new boundaries start fall 2027. Details: https://example.com/boundaries', visit: 'Example: call the main office to ask about a visit.'}, 40),
     mk('rentals', {address: '123 Example St', area: 'West Linn', hood: 'Willamette', rent: 2800, beds: 3, baths: 2, status: 'Like', link: 'https://example.com/listing'}, 30),
     mk('rentals', {address: '456 Sample Ave', area: 'Sellwood-Moreland', rent: 2550, beds: 2, baths: 1, status: 'New', _geo: '456 Sample Ave'}, 29),
     mk('house', {task: 'Example: interview listing agents', category: 'Agent', who: 'Both', due: '2027-02-01'}, 20),
@@ -735,13 +748,28 @@ function cell(t, c, v){
     case 'date': inner = '<input type="date"' + a + ' value="' + esc(v) + '">'; break;
     case 'num': inner = '<input type="number" inputmode="decimal" step="any"' + a + ' value="' + esc(v) + '">'; break;
     case 'money': inner = '<span class="cur">$</span><input type="number" inputmode="decimal" step="any"' + a + ' value="' + esc(v) + '">'; break;
-    case 'long': inner = '<textarea rows="1"' + a + '>' + esc(v) + '</textarea>'; break;
+    case 'long': inner = '<textarea rows="1"' + a + '>' + esc(v) + '</textarea>' + textLinks(v); break;
     case 'url': inner = '<input type="url" placeholder="https://"' + a + ' value="' + esc(v) + '">' + openLink(v); break;
     case 'who': inner = '<input type="text" list="dl-who"' + a + ' value="' + esc(v) + '">'; break;
     case 'suggest': inner = '<input type="text" list="dl-' + t.key + '-' + c.k + '"' + a + ' value="' + esc(v) + '">'; break;
     default: inner = '<input type="text"' + a + ' value="' + esc(v) + '">';
   }
-  return '<td data-label="' + esc(c.l) + '"><div class="cv">' + inner + '</div></td>';
+  return '<td data-label="' + esc(c.l) + '"><div class="cv' + (c.t === 'long' ? ' cvl' : '') + '">' + inner + '</div></td>';
+}
+
+// web addresses typed into a long cell (notes, dates) show as links under it, named by their site
+function textLinks(v){
+  var seen = {}, out = [];
+  String(v || '').replace(/https?:\/\/[^\s<>"')\]]+/g, function(u){
+    u = u.replace(/[.,;:!?]+$/, '');
+    if (safeUrl(u) && !seen[u] && out.length < 4){ seen[u] = 1; out.push(u); }
+    return u;
+  });
+  if (!out.length) return '';
+  return '<span class="tl">' + out.map(function(u){
+    var host = u.replace(/^https?:\/\//i, '').split(/[\/?#]/)[0].replace(/^www\./i, '');
+    return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(host) + '</a>';
+  }).join('') + '</span>';
 }
 
 function openLink(v){ var u = safeUrl(v); return u ? '<a class="open" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open</a>' : ''; }
@@ -1316,6 +1344,7 @@ document.addEventListener('change', function(e){
   else v = el.value.trim();
   if (k === 'done') tr.classList.toggle('done', !!v);
   if (c.t === 'url'){ var old = $('.open', el.parentNode); if (old) old.remove(); el.insertAdjacentHTML('afterend', openLink(v)); }
+  if (c.t === 'long'){ var tl = $('.tl', el.parentNode); if (tl) tl.remove(); el.insertAdjacentHTML('afterend', textLinks(v)); }
   saveCell(tr.dataset.id, k, v).catch(function(){});
 });
 
