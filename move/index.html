@@ -512,7 +512,8 @@ var api = DEMO ? demoApi() : {
   },
   setJob: async function(id, status){ must(await sb.from('jobs').update({status: status}).eq('id', id)); },
   opps: async function(){
-    return must(await sb.from('opportunities').select('id,kind,title,org,location,url,deadline,status,description,amount_raw')
+    return must(await sb.from('opportunities').select('id,kind,title,org,location,url,deadline,status,description,amount_raw,' +
+        'routes,who_can_apply,eligibility_note,sponsor_note,residency,deadline_note,fit_notes')
       .in('status', ['new', 'watch', 'pursue']).order('deadline', {ascending: true, nullsFirst: false}).limit(200));
   },
   oppCount: async function(){
@@ -560,7 +561,11 @@ function demoApi(){
   ];
   rows.push((function(){ var r = mk('applications', {job_id: 3, applied_on: '2026-09-20', outcome: 'Passed over', note: 'Example: the job site says no longer under consideration.'}, 70); r.source = 'jobs'; r.ext_id = 'job-3'; return r; })());
   var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', amount_raw: '$10,000 - $50,000',
-    description: 'Demo opportunity. Example text long enough to fold: it funds projects that bring people together around the arts, with a match required and a letter of intent due first. Nothing here is real.'}];
+    description: 'Demo opportunity. Example text long enough to fold: it funds projects that bring people together around the arts, with a match required and a letter of intent due first. Nothing here is real.'},
+    {id: 2, kind: 'grant', title: 'Example project grant (2027)', org: 'Example county arts group', location: 'Portland area', url: 'https://example.com/grant-2', deadline: null, status: 'new',
+      amount_raw: 'Up to $3,000', routes: ['llc', 'sponsor'], residency: '“Be headquartered within Example County.”', sponsor_note: '“If you use a fiscal sponsor, include a signed agreement.”',
+      deadline_note: 'Closed. The last round ran August 24 to October 2.', who_can_apply: '“Nonprofits, LLCs and other incorporated groups.”', fit_notes: 'On your watch list',
+      description: 'What it funds: “Example events, programs and workshops.” Read from their site on Oct 8, 2026. Nothing here is real.'}];
   function copy(v){ return new Promise(function(res){ setTimeout(function(){ res(JSON.parse(JSON.stringify(v))); }, 120); }); }
   function find(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
   return {
@@ -1443,7 +1448,7 @@ function jobsLine(){
 
 function drawJobs(){
   $('#view').innerHTML = '<div class="head"><h2>Jobs</h2></div>' +
-    '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads.</p>' +
+    '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads from grantscan.</p>' +
     '<div class="chips" id="jchips"></div><div id="jtools"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
   drawJobChips(); drawJobTools(); loadJobList();
 }
@@ -1476,6 +1481,7 @@ async function loadJobList(){
     el = $('#jlist');
     if (!list.length){
       el.innerHTML = '<div class="empty">' + (view === 'queued' ? 'The queue is empty. Run jobscan to look for new postings.'
+        : view === 'opps' ? 'Nothing here. Run grantscan to look for grants.'
         : view === 'passed' && S.jobQ.trim() ? 'No passed job matches that.' : 'Nothing here.') + '</div>';
       return;
     }
@@ -1585,11 +1591,21 @@ function jobCard(j){
     '<button class="btn small primary" data-job="applied"' + id + '>Applied</button><button class="btn small quiet" data-job="user_rejected"' + id + '>Pass</button>' + postingBtn(j), foot);
 }
 
+// How Jeffrey could apply, as grantscan labels it from the funder's own words (Grants/README.md).
+var OPP_ROUTES = {you: 'You apply', llc: 'Your LLC', sponsor: 'Fiscal sponsor', partner: 'A partner applies', check: 'Check who can apply'};
+
 function oppCard(o){
-  var u = safeUrl(o.url), id = ' data-id="' + o.id + '"';
-  var lines = jline('Due', esc(o.deadline ? day(o.deadline) : 'Rolling')) + (o.amount_raw ? jline('Amount', esc(o.amount_raw)) : '');
-  var desc = o.description ? '<div class="ssec' + (String(o.description).length > 150 ? ' fold' : '') + '"><p class="k">About</p><p class="v">' + esc(o.description) + '</p></div>' +
-    (String(o.description).length > 150 ? '<button class="mini mlink" data-unfold>Show all</button>' : '') : '';
+  var u = safeUrl(o.url), id = ' data-id="' + o.id + '"', routes = o.routes || [];
+  var lines = (o.deadline ? jline('Due', esc(day(o.deadline))) : '') +
+    (o.deadline_note || !o.deadline ? jline(o.deadline ? 'Note' : 'When', esc(o.deadline_note || 'No date listed')) : '') +
+    (o.amount_raw ? jline('Amount', esc(o.amount_raw)) : '') +
+    (routes.length ? jline('Apply as', esc(routes.map(function(r){ return OPP_ROUTES[r] || r; }).join(', '))) : '') +
+    (o.residency ? jline('Required', esc(o.residency)) : '') +
+    (routes.indexOf('sponsor') >= 0 || o.sponsor_note ? jline('Fiscal sponsor', esc(o.sponsor_note || 'Not stated on their page')) : '');
+  var about = [o.who_can_apply ? 'Who can apply: ' + o.who_can_apply : '', o.eligibility_note ? 'Eligibility: ' + o.eligibility_note : '',
+    o.description || ''].filter(Boolean).join(' ');
+  var desc = about ? '<div class="ssec' + (about.length > 150 ? ' fold' : '') + '"><p class="k">About</p><p class="v">' + esc(about) + '</p></div>' +
+    (about.length > 150 ? '<button class="mini mlink" data-unfold>Show all</button>' : '') : '';
   var stat = {new: 'New', watch: 'Watching', pursue: 'Pursuing'}[o.status] || o.status;
   return '<article class="sc jc opp" data-card="' + o.id + '"><div class="sch"><h3>' +
     (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(o.title) + '</a>' : esc(o.title)) + '</h3><span class="jpill">' + esc(stat) + '</span></div>' +
@@ -1597,7 +1613,8 @@ function oppCard(o){
     '<div class="scon">' + lines + '</div>' + desc +
     '<div class="slinks"><button class="btn small primary" data-opp="pursue"' + id + '>Pursue</button><button class="btn small quiet" data-opp="watch"' + id + '>Watch</button>' +
     (u ? '<a class="btn small quiet" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open</a>' : '') + '</div>' +
-    '<div class="sfoot"><span class="sp"></span><button class="mini" data-opp="dismissed"' + id + '>Dismiss</button></div></article>';
+    '<div class="sfoot">' + (o.fit_notes ? '<span class="edited">' + esc(o.fit_notes) + '</span>' : '') +
+    '<span class="sp"></span><button class="mini" data-opp="dismissed"' + id + '>Dismiss</button></div></article>';
 }
 
 async function jobAction(id, status, prev){

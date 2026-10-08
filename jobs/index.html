@@ -170,7 +170,7 @@ function loadJobs(t){
 
 function loadOpps(t){
   sb.from('opportunities')
-    .select('id,kind,source,title,org,location,url,deadline,status,description')
+    .select('id,kind,source,title,org,location,url,deadline,status,description,amount_raw,routes,who_can_apply,sponsor_note,residency,deadline_note')
     .in('status', t.q.val)
     .order('deadline', {ascending:true, nullsFirst:false})
     .limit(t.limit || 200)
@@ -188,8 +188,15 @@ function oppCard(o){
   h += '<div class="meta">' + esc(o.org || '');
   if (o.location) h += ' &middot; ' + esc(o.location);
   h += ' &middot; <span class="pill">' + esc(o.kind) + '</span>';
-  h += o.deadline ? ' &middot; due ' + esc(o.deadline) : ' &middot; rolling';
+  h += o.deadline ? ' &middot; due ' + esc(o.deadline) : ' &middot; ' + esc(o.deadline_note || 'no date listed');
   h += ' &middot; <span class="pill">' + esc(o.status) + '</span></div>';
+  // grantscan's labels, in the funder's own words (Grants/README.md)
+  var routes = {you: 'You apply', llc: 'Your LLC', sponsor: 'Fiscal sponsor', partner: 'A partner applies', check: 'Check who can apply'};
+  var facts = [o.amount_raw ? 'Amount: ' + o.amount_raw : '',
+    (o.routes || []).length ? 'Apply as: ' + o.routes.map(function(r){ return routes[r] || r; }).join(', ') : '',
+    o.residency ? 'Required: ' + o.residency : '', o.sponsor_note ? 'Fiscal sponsor: ' + o.sponsor_note : '',
+    o.who_can_apply ? 'Who can apply: ' + o.who_can_apply : ''].filter(Boolean);
+  if (facts.length) h += '<div class="notes">' + facts.map(esc).join('<br>') + '</div>';
   if (o.description) h += '<div class="notes">' + esc(o.description) + '</div>';
   el.innerHTML = h;
   var act = document.createElement('div'); act.className = 'actions';
