@@ -767,8 +767,10 @@ function textLinks(v){
   });
   if (!out.length) return '';
   return '<span class="tl">' + out.map(function(u){
-    var host = u.replace(/^https?:\/\//i, '').split(/[\/?#]/)[0].replace(/^www\./i, '');
-    return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(host) + '</a>';
+    var rest = u.replace(/^https?:\/\//i, ''), host = rest.split(/[\/?#]/)[0].replace(/^www\./i, '');
+    var last = rest.split(/[?#]/)[0].split('/').filter(Boolean).slice(1).pop() || '';
+    if (last.length > 30) last = last.slice(0, 29) + '…';
+    return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(host + (last ? ' › ' + last : '')) + '</a>';
   }).join('') + '</span>';
 }
 
