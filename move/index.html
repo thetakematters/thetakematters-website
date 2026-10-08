@@ -206,6 +206,10 @@ var DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]demo\b/.
 var sb = !DEMO && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
 
 var AREAS = ['West Linn', 'Sherwood', 'Mount Tabor area', 'Grant High area', 'Sellwood-Moreland', 'SW Washington', 'Other'];
+// Jeffrey's Zillow saved searches, one per school (a rent search and a buy search for each).
+// Portland first, then West Linn. load_listing_emails.py has the same list in SEARCH_AREA.
+var SCHOOL_SEARCHES = ['Grant High School', 'Beaumont Middle School', 'Harrison Park School', 'Sellwood Middle School',
+                       'Athey Creek Middle School', 'Rosemont Ridge Middle School'];
 var PEOPLE = ['Jeffrey', 'Paige', 'Both'];
 
 // Each sheet tab is rows in move_rows with tab = key. Column types: text, long,
@@ -238,7 +242,7 @@ var TABS = [
    cols: [
      {k: 'address', l: 'Address', t: 'text', w: 270},
      {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
-     {k: 'search', l: 'School search', t: 'suggest', w: 210},
+     {k: 'search', l: 'School search', t: 'select', opts: SCHOOL_SEARCHES, w: 240},
      {k: 'hood', l: 'Neighborhood', t: 'suggest', sugg: ['Willamette', 'Tanner Basin', 'Rosemont', 'Robinwood'], w: 150},
      {k: 'rent', l: 'Rent / mo', t: 'money', w: 120},
      {k: 'beds', l: 'Beds', t: 'num', w: 80},
@@ -258,7 +262,7 @@ var TABS = [
    cols: [
      {k: 'address', l: 'Address', t: 'text', w: 270},
      {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
-     {k: 'search', l: 'School search', t: 'suggest', w: 210},
+     {k: 'search', l: 'School search', t: 'select', opts: SCHOOL_SEARCHES, w: 240},
      {k: 'price', l: 'Price', t: 'money', w: 140},
      {k: 'beds', l: 'Beds', t: 'num', w: 80},
      {k: 'baths', l: 'Baths', t: 'num', w: 80},
@@ -377,12 +381,12 @@ function demoApi(){
   }
   var found = today(), z = 'https://example.com/listing/';
   var rows = [
-    mk('rentals', {address: '101 Example St, Portland, OR', area: 'Mount Tabor area', search: 'Example Park School', rent: 2350, beds: 3, baths: 1, sqft: 1568, pets: true, status: 'New', found: found, link: z + '1'}, 2, 'zillow'),
-    mk('rentals', {address: '202 Sample Ave APT 4, Portland, OR', area: 'Mount Tabor area', search: 'Example Park School', rent: 2200, beds: 2, baths: 1, sqft: 942, pets: true, status: 'New', found: found, link: z + '2'}, 2, 'zillow'),
-    mk('rentals', {address: 'Address not shown, Portland, OR', area: 'Grant High area', search: 'Example High School', rent: 2995, beds: 3, baths: 3, sqft: 2246, status: 'New', found: found, link: z + '3'}, 2, 'zillow'),
-    mk('buy', {address: '303 Example Rd, West Linn, OR', area: 'West Linn', search: 'Example Middle School', price: 764900, beds: 4, baths: 3, sqft: 2264, status: 'New', open: 'Sun Oct 11, 12pm-2pm', broker: 'Example Realty', found: found, link: z + '4'}, 2, 'zillow'),
-    mk('buy', {address: '404 Sample Cir, West Linn, OR', area: 'West Linn', search: 'Example Middle School', price: 619500, beds: 4, baths: 2, sqft: 2073, status: 'New', cut: '$400 (9/17)', open: 'Fri Oct 9, 4pm-6pm / Sat Oct 10, 11am-1pm', broker: 'Sample Properties, LLC', found: found, link: z + '5'}, 2, 'zillow'),
-    mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Example High School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6'}, 30, 'zillow'),
+    mk('rentals', {address: '101 Example St, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2350, beds: 3, baths: 1, sqft: 1568, pets: true, status: 'New', found: found, link: z + '1'}, 2, 'zillow'),
+    mk('rentals', {address: '202 Sample Ave APT 4, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2200, beds: 2, baths: 1, sqft: 942, pets: true, status: 'New', found: found, link: z + '2'}, 2, 'zillow'),
+    mk('rentals', {address: 'Address not shown, Portland, OR', area: 'Sellwood-Moreland', search: 'Sellwood Middle School', rent: 2995, beds: 3, baths: 3, sqft: 2246, status: 'New', found: found, link: z + '3'}, 2, 'zillow'),
+    mk('buy', {address: '303 Example Rd, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 764900, beds: 4, baths: 3, sqft: 2264, status: 'New', open: 'Sun Oct 11, 12pm-2pm', broker: 'Example Realty', found: found, link: z + '4'}, 2, 'zillow'),
+    mk('buy', {address: '404 Sample Cir, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 619500, beds: 4, baths: 2, sqft: 2073, status: 'New', cut: '$400 (9/17)', open: 'Fri Oct 9, 4pm-6pm / Sat Oct 10, 11am-1pm', broker: 'Sample Properties, LLC', found: found, link: z + '5'}, 2, 'zillow'),
+    mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Beaumont Middle School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6'}, 30, 'zillow'),
     mk('timeline', {date: '2027-06-01', what: 'Example: move window opens', who: 'Both'}, 50),
     mk('timeline', {date: '2026-11-15', what: 'Example: settle the rent budget', who: 'Jeffrey', done: true}, 49),
     mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at'}, 40),
@@ -537,7 +541,8 @@ function colOf(t, k){ return t.cols.filter(function(c){ return c.k === k; })[0];
 
 function drawSheetView(){
   var t = TAB[S.tab];
-  var searches = hasCol(t, 'search') ? valuesOf(t.key, 'search') : [];
+  // the six searches, plus any other name a row already has
+  var searches = hasCol(t, 'search') ? SCHOOL_SEARCHES.concat(valuesOf(t.key, 'search').filter(function(v){ return SCHOOL_SEARCHES.indexOf(v) < 0; })) : [];
   $('#view').innerHTML =
     '<div class="head"><h2>' + esc(t.label) + '</h2><span class="save" id="save" role="status"></span></div>' +
     '<p class="blurb">' + esc(t.blurb) + '</p>' +
