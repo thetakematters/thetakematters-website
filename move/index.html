@@ -126,6 +126,18 @@ table.sheet{border-collapse:collapse;width:100%}
 .sheet .cur{color:var(--slate);padding-left:6px}
 .sheet .open{font-size:13.5px;font-weight:600;white-space:nowrap;padding:0 6px}
 .cv.cvl{flex-direction:column;align-items:stretch;gap:0}
+.sheet textarea.clip{-webkit-mask-image:linear-gradient(180deg,#000 55%,transparent);mask-image:linear-gradient(180deg,#000 55%,transparent)}
+.sheet .mbtn{display:none;flex:none;color:var(--teal-t)}
+.sheet tr.longrow .mbtn{display:inline-block}
+.cv.clipped .tl{display:none}
+.sheet tr.det>td{padding:0;background:var(--mist);border-bottom:1px solid var(--rule2)}
+.detail{position:sticky;left:0;width:calc(min(100vw, 1240px) - 58px);padding:14px 16px 16px}
+.detail h4{font:500 20px/1.25 var(--serif);margin:0 0 10px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px 24px}
+.dgrid .f{min-width:0}
+.dgrid .f.wide{grid-column:1/-1}
+.dgrid .k{font:500 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:0 0 2px}
+.dgrid .v{font-size:15px;line-height:1.5;margin:0;overflow-wrap:anywhere;max-width:860px}
 .tl{display:flex;flex-wrap:wrap;gap:2px 12px;padding:0 9px 5px;font-size:13.5px;font-weight:600}
 .tl a{white-space:nowrap}
 .sheet td.rt{white-space:nowrap;text-align:right;vertical-align:middle;padding-right:8px}
@@ -230,6 +242,10 @@ table.sheet{border-collapse:collapse;width:100%}
   .sheet td.rt{display:flex;justify-content:space-between;align-items:center;padding-top:6px;margin-top:4px;border-top:1px solid var(--rule)}
   .sheet td.rt::before{content:none}
   .sheet tr.done td,.sheet tr.fresh td,.sheet tr.arch td{background:none}
+  .sheet tr.det{background:var(--mist);margin-top:-8px}
+  .sheet tr.det>td{display:block;background:none;border:0}
+  .sheet tr.det>td::before{content:none}
+  .detail{position:static;width:auto;padding:8px 2px 6px}
   .sheet tr.done{background:#F7F4EE}
   .sheet tr.fresh{background:var(--teal-tint)}
   .sheet tr.arch{background:var(--mist)}
@@ -285,7 +301,7 @@ var TABS = [
    blurb: 'The schools behind your searches, with how to enroll, who to call or email, and the dates that matter. Before you rent or buy, put the address into Check an address to see which schools it’s assigned to.',
    sort: {k: 'area', dir: 1}, defaults: {status: 'To look at'},
    cols: [
-     {k: 'school', l: 'School', t: 'text', w: 220},
+     {k: 'school', l: 'School', t: 'text', w: 270},
      {k: 'level', l: 'Level', t: 'select', opts: ['Elementary', 'Middle', 'High', 'Other'], w: 120},
      {k: 'district', l: 'District', t: 'suggest', sugg: ['West Linn-Wilsonville School District', 'Sherwood School District', 'Portland Public Schools'], w: 230},
      {k: 'area', l: 'Area', t: 'select', opts: AREAS, w: 170},
@@ -373,7 +389,7 @@ var TABS = [
 var TAB = {};
 TABS.forEach(function(t){ TAB[t.key] = t; });
 
-var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
+var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
          loadedAt: 0, saving: 0, saveErr: ''};
 
@@ -596,7 +612,7 @@ function drawTabs(){
 
 function goTab(key){
   if (!TAB[key]) return;
-  S.tab = key; S.q = ''; S.search = ''; S.fresh = {};
+  S.tab = key; S.q = ''; S.search = ''; S.fresh = {}; S.open = {};
   history.replaceState(null, '', '#' + key);
   drawTabs(); drawView();
   var bar = $('.tbar');
@@ -715,7 +731,7 @@ function drawSheet(){
       return '<th style="min-width:' + (c.w || 120) + 'px" aria-sort="' + (on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" data-sort="' + c.k + '">' +
         esc(c.l) + (on ? ' <span class="arr">' + (s.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</button></th>';
     }).join('') + '<th><span class="sr">Row</span></th></tr></thead><tbody>' +
-      rows.map(function(r){ return rowHtml(t, r); }).join('') + '</tbody></table></div>';
+      rows.map(function(r){ return rowHtml(t, r) + (S.open[r.id] ? detHtml(t, r) : ''); }).join('') + '</tbody></table></div>';
   }
   h += '<button class="addrow" data-act="add">+ ' + esc(t.add) + '</button>';
   box.innerHTML = h;
@@ -725,8 +741,9 @@ function drawSheet(){
 
 function rowHtml(t, r){
   var cls = [r.data.done ? 'done' : '', r.archived ? 'arch' : '', S.fresh[r.id] ? 'fresh' : ''].join(' ').trim();
+  var more = '<button class="mini mbtn" data-act="more" aria-expanded="' + !!S.open[r.id] + '">' + (S.open[r.id] ? 'Less' : 'More') + '</button>';
   return '<tr data-id="' + esc(r.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
-    t.cols.map(function(c){ return cell(t, c, r.data[c.k]); }).join('') +
+    t.cols.map(function(c, i){ var h = cell(t, c, r.data[c.k]); return i ? h : h.replace(/<\/div><\/td>$/, more + '</div></td>'); }).join('') +
     '<td class="rt"><span class="edited">' + esc(edited(r)) + '</span>' +
     (r.archived ? '<button class="mini" data-act="restore">Restore</button>'
                 : '<button class="mini warn" data-act="archive" aria-label="Archive this row">Archive</button>') +
@@ -767,10 +784,7 @@ function textLinks(v){
   });
   if (!out.length) return '';
   return '<span class="tl">' + out.map(function(u){
-    var rest = u.replace(/^https?:\/\//i, ''), host = rest.split(/[\/?#]/)[0].replace(/^www\./i, '');
-    var last = rest.split(/[?#]/)[0].split('/').filter(Boolean).slice(1).pop() || '';
-    if (last.length > 30) last = last.slice(0, 29) + '…';
-    return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(host + (last ? ' › ' + last : '')) + '</a>';
+    return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(linkName(u)) + '</a>';
   }).join('') + '</span>';
 }
 
@@ -794,7 +808,61 @@ function drawLists(t){
   $('#dls').innerHTML = out.join('');
 }
 
-function grow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 3) + 'px'; }
+// A long cell shows about two lines in the sheet, so one long note can't stretch its whole row; it opens up
+// while you edit it, and More under the row shows everything.
+var CLIP = 58;
+function grow(el){
+  var editing = document.activeElement === el;
+  el.style.height = 'auto';
+  var full = el.scrollHeight + 3;
+  el.style.height = (editing ? full : Math.min(full, CLIP)) + 'px';
+  el.classList.toggle('clip', !editing && full > CLIP);
+  if (el.parentNode && el.parentNode.classList) el.parentNode.classList.toggle('clipped', !editing && full > CLIP);
+  var tr = el.closest && el.closest('tr[data-id]');
+  if (tr) tr.classList.toggle('longrow', !!tr.querySelector('textarea.clip') || !!S.open[tr.dataset.id]);
+}
+
+// a row's details: its text, long and link cells in full, read-only, with web addresses, emails and phone
+// numbers as links (the short cells, like Status or Area, are already in the row)
+var DET_TYPES = {text: 1, long: 1, url: 1};
+function detHtml(t, r){
+  var title = r.data[t.cols[0].k];
+  var fields = t.cols.slice(1).map(function(c){
+    var v = r.data[c.k];
+    if (!DET_TYPES[c.t] || v == null || v === '' || v === false) return '';
+    var out;
+    if (c.t === 'url') out = safeUrl(v) ? '<a href="' + esc(safeUrl(v)) + '" target="_blank" rel="noopener noreferrer">' + esc(linkName(safeUrl(v))) + '</a>' : esc(v);
+    else if (c.t === 'check') out = 'Yes';
+    else if (c.t === 'date') out = esc(day(v) || v);
+    else if (c.t === 'money') out = esc(money(v));
+    else out = linkify(v);
+    var wide = c.t === 'long' && String(v).length > 120;
+    return '<div class="f' + (wide ? ' wide' : '') + '"><p class="k">' + esc(c.l) + '</p><p class="v">' + out + '</p></div>';
+  }).join('');
+  return '<tr class="det" data-det="' + esc(r.id) + '"><td colspan="' + (t.cols.length + 1) + '"><div class="detail">' +
+    (title ? '<h4>' + esc(title) + '</h4>' : '') + '<div class="dgrid">' + fields + '</div></div></td></tr>';
+}
+
+function linkName(u){
+  var rest = u.replace(/^https?:\/\//i, ''), host = rest.split(/[\/?#]/)[0].replace(/^www\./i, '');
+  var parts = rest.split(/[?#]/)[0].split('/').filter(Boolean).slice(1);
+  while (parts.length && /^(index|default)\.\w+$/i.test(parts[parts.length - 1])) parts.pop();
+  var last = parts.pop() || '';
+  if (last.length > 30) last = last.slice(0, 29) + '…';
+  return host + (last ? ' › ' + last : '');
+}
+
+function linkify(text){
+  var h = esc(text).replace(/https?:\/\/[^\s<>"')\]]+/g, function(u){
+    var trail = (u.match(/[.,;:!?]+$/) || [''])[0];
+    u = u.slice(0, u.length - trail.length);
+    var raw = u.replace(/&amp;/g, '&');
+    return safeUrl(raw) ? '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + esc(linkName(raw)) + '</a>' + trail : u + trail;
+  });
+  h = h.replace(/(^|[\s(])([\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g, function(m, pre, em){ return pre + '<a href="mailto:' + em + '">' + em + '</a>'; });
+  h = h.replace(/(^|[\s(:])(\(?\d{3}\)?[ .-]?\d{3}-\d{4})(?!\d)/g, function(m, pre, ph){ return pre + '<a href="tel:+1' + ph.replace(/\D/g, '') + '">' + ph + '</a>'; });
+  return h.replace(/\n/g, '<br>');
+}
 
 /* ---------- saving ---------- */
 
@@ -842,6 +910,8 @@ async function saveCell(id, k, v){
   });
   var tr = document.querySelector('tr[data-id="' + CSS.escape(id) + '"]');
   if (tr){ var ed = $('.edited', tr); if (ed) ed.textContent = edited(row); }
+  var det = document.querySelector('tr[data-det="' + CSS.escape(id) + '"]');
+  if (det) det.outerHTML = detHtml(TAB[S.tab], row);
   drawMeta(); drawTabs();
 }
 
@@ -1328,6 +1398,10 @@ document.addEventListener('click', async function(e){
   var tr = b.closest('tr[data-id]');
   if (tr && act === 'archive'){ setArchived(tr.dataset.id, true); return; }
   if (tr && act === 'restore'){ setArchived(tr.dataset.id, false); return; }
+  if (tr && act === 'more'){
+    if (S.open[tr.dataset.id]) delete S.open[tr.dataset.id]; else S.open[tr.dataset.id] = 1;
+    drawSheet(); return;
+  }
 });
 
 document.addEventListener('change', function(e){
@@ -1348,6 +1422,12 @@ document.addEventListener('change', function(e){
   if (c.t === 'url'){ var old = $('.open', el.parentNode); if (old) old.remove(); el.insertAdjacentHTML('afterend', openLink(v)); }
   if (c.t === 'long'){ var tl = $('.tl', el.parentNode); if (tl) tl.remove(); el.insertAdjacentHTML('afterend', textLinks(v)); }
   saveCell(tr.dataset.id, k, v).catch(function(){});
+});
+
+document.addEventListener('focusin', function(e){ if (e.target.tagName === 'TEXTAREA') grow(e.target); });
+document.addEventListener('focusout', function(e){
+  var el = e.target;
+  if (el.tagName === 'TEXTAREA') setTimeout(function(){ if (document.body.contains(el)) grow(el); }, 0);
 });
 
 document.addEventListener('input', function(e){
