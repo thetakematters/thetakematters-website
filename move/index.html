@@ -17,7 +17,9 @@
   copies the earlier row to move_versions. The Jobs tab reads the job scan tables.
   Rentals and Houses to buy also get homes from the Zillow alert emails (source
   'zillow', loaded by load_listing_emails.py outside this repo). Those wait in a New
-  list at the top of the tab: Save sets them to Like, Pass archives them.
+  list at the top of the tab: Save sets them to Like, Pass archives them. The Map tab
+  shows them as pins (positions from the Census geocoder, kept in data._lat, _lon and
+  _geo by the same script) with the six schools, on the LSRI lab's live map.
   Same look as the Oregon Sound Circuit notebook. Local preview with demo data:
   http://localhost:PORT/move/?demo (localhost only, nothing is saved).
 -->
@@ -158,6 +160,44 @@ table.sheet{border-collapse:collapse;width:100%}
 .lp{font-size:16px;font-weight:600;margin:0 0 6px}
 .lx{font-size:14.5px;color:var(--ink);margin:0 0 5px}
 
+/* the Map tab */
+.seg{display:inline-flex;border:1.5px solid var(--line2);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{background:none;border:0;padding:7px 12px;font-size:15px;font-weight:600;color:var(--slate);cursor:pointer;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--rule2)}
+.seg button[aria-pressed=true]{background:var(--navy);color:#fff}
+.mapwrap{position:relative;border:1px solid var(--rule);border-radius:14px;overflow:hidden;background:var(--mist)}
+.mapbox{height:min(68vh,720px);min-height:380px}
+.mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;color:var(--slate);background:var(--mist)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 2px 0;font-size:14px;color:var(--slate)}
+.legend>span{display:inline-flex;align-items:center;gap:4px}
+.mapnote{color:var(--slate);font-size:14.5px;margin:6px 2px 0;max-width:900px}
+.pin{display:block;width:30px;height:30px;position:relative;cursor:pointer}
+.pin i{position:absolute;inset:7px;border-radius:50%;background:var(--teal);border:2.5px solid #fff;box-shadow:0 1px 3px rgba(15,39,66,.4)}
+.pin.new i{background:#fff;border:3.5px solid var(--teal)}
+.pin.buy i{border-radius:4px;background:var(--coral)}
+.pin.buy.new i{background:#fff;border-color:var(--coral)}
+.pin.school{width:26px;height:26px}
+.pin.school i{inset:7px;border-radius:2px;transform:rotate(45deg);background:var(--navy);border:2px solid #fff}
+.pin.school span{position:absolute;left:23px;top:50%;transform:translateY(-50%);white-space:nowrap;font:600 12.5px/1.2 var(--sans);color:var(--navy);background:rgba(255,255,255,.9);padding:2px 6px;border-radius:6px;box-shadow:0 1px 2px rgba(15,39,66,.2)}
+.pin.dim{opacity:.35}
+.pin:focus-visible{outline:2px solid var(--teal-t);outline-offset:1px;border-radius:50%}
+.legend .pin{display:inline-block;width:22px;height:22px;cursor:default}
+.legend .pin i{inset:3px}
+.legend .pin.school i{inset:5px}
+.mapbox .maplibregl-popup-content{font:15px/1.45 var(--sans);color:var(--ink);border-radius:12px;padding:12px 14px;box-shadow:0 6px 24px rgba(15,39,66,.22)}
+.mapbox .maplibregl-popup-close-button{font-size:20px;width:30px;height:30px;color:var(--slate);border-radius:0 12px 0 8px}
+.pop h3{font:500 19px/1.25 var(--serif);margin:0 0 4px;padding-right:20px}
+.pop h3 a{color:var(--ink);text-decoration:none}
+.pop h3 a:hover{color:var(--teal-t);text-decoration:underline}
+.pop .pk{font:500 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--teal-t);margin:0 0 3px}
+.pop .lp{font-size:15px;font-weight:600;margin:0 0 5px}
+.pop .lx{font-size:14px;margin:0 0 4px}
+.pop .jm{font-size:13.5px;margin:0 0 9px}
+.pop .acts{gap:6px;margin:0 0 8px}
+.pop .pl{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:14px;font-weight:600}
+.lnk{background:none;border:0;padding:0;font:inherit;color:var(--teal-t);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
+.job.hl{outline:2.5px solid var(--teal);outline-offset:2px}
+
 /* undo toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
 .toast button{background:none;border:1.5px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font-weight:600;cursor:pointer}
@@ -174,6 +214,8 @@ table.sheet{border-collapse:collapse;width:100%}
   .mast-r .who{display:none}
   .tools input[type=search]{width:100%}
   .queue{padding:12px 10px 12px}
+  .mapbox{height:62vh;min-height:320px}
+  .seg button{padding:7px 10px;font-size:14.5px}
   .qgrid{grid-template-columns:minmax(0,1fr)}
   .head h2{font-size:27px}
   .sheet-wrap{overflow:visible;border:0;background:none}
@@ -210,6 +252,17 @@ var AREAS = ['West Linn', 'Sherwood', 'Mount Tabor area', 'Grant High area', 'Se
 // Portland first, then West Linn. load_listing_emails.py has the same list in SEARCH_AREA.
 var SCHOOL_SEARCHES = ['Grant High School', 'Beaumont Middle School', 'Harrison Park School', 'Sellwood Middle School',
                        'Athey Creek Middle School', 'Rosemont Ridge Middle School'];
+// The school behind each search, as a pin on the Map tab. Address as the school's own homepage gives it
+// (read 8 Oct 2026), position from the Census geocoder. Athey Creek has none: the Census address data
+// doesn't have 2110 Brandon Place. load_listing_emails.py --schools prints these lines from its saved answers.
+var SCHOOL_PINS = [
+  {search: 'Grant High School', name: 'Grant High School', short: 'Grant High', addr: '2245 NE 36th Avenue, Portland, OR 97212', url: 'https://grant.pps.net/', lat: 45.53944, lon: -122.626107},
+  {search: 'Beaumont Middle School', name: 'Beaumont Middle School', short: 'Beaumont', addr: '4043 NE Fremont, Portland, OR 97212', url: 'https://beaumont.pps.net/', lat: 45.548355, lon: -122.621358},
+  {search: 'Harrison Park School', name: 'Harrison Park Middle School', short: 'Harrison Park', addr: '2225 SE 87th Ave, Portland, OR 97216', url: 'https://harrisonpark.pps.net/', lat: 45.506658, lon: -122.574302},
+  {search: 'Sellwood Middle School', name: 'Sellwood Middle School', short: 'Sellwood', addr: '8300 SE 15th Ave, Portland, OR 97202', url: 'https://sellwood.pps.net/', lat: 45.462838, lon: -122.650929},
+  {search: 'Athey Creek Middle School', name: 'Athey Creek Middle School', short: 'Athey Creek', addr: '2110 Brandon Place, West Linn, OR 97068', url: 'https://atheycreek.wlwv.k12.or.us/'},
+  {search: 'Rosemont Ridge Middle School', name: 'Rosemont Ridge Middle School', short: 'Rosemont Ridge', addr: '20001 Salamo Road, West Linn, OR 97068', url: 'https://rosemontridge.wlwv.k12.or.us/', lat: 45.36859, lon: -122.646957}
+];
 var PEOPLE = ['Jeffrey', 'Paige', 'Both'];
 
 // Each sheet tab is rows in move_rows with tab = key. Column types: text, long,
@@ -275,6 +328,7 @@ var TABS = [
      {k: 'found', l: 'Found', t: 'date', w: 150},
      {k: 'link', l: 'Link', t: 'url', w: 190},
      {k: 'notes', l: 'Notes', t: 'long', w: 260}]},
+  {key: 'map', label: 'Map', map: true},
   {key: 'house', label: 'Selling the house', add: 'Add a task', tasks: true,
    blurb: 'Everything it takes to sell the Tucson house.',
    sort: {k: 'due', dir: 1},
@@ -308,7 +362,7 @@ var TABS = [
 var TAB = {};
 TABS.forEach(function(t){ TAB[t.key] = t; });
 
-var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '', search: '',
+var S = {user: null, tab: 'timeline', rows: [], fresh: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null,
          loadedAt: 0, saving: 0, saveErr: ''};
 
@@ -381,17 +435,17 @@ function demoApi(){
   }
   var found = today(), z = 'https://example.com/listing/';
   var rows = [
-    mk('rentals', {address: '101 Example St, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2350, beds: 3, baths: 1, sqft: 1568, pets: true, status: 'New', found: found, link: z + '1'}, 2, 'zillow'),
-    mk('rentals', {address: '202 Sample Ave APT 4, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2200, beds: 2, baths: 1, sqft: 942, pets: true, status: 'New', found: found, link: z + '2'}, 2, 'zillow'),
+    mk('rentals', {address: '101 Example St, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2350, beds: 3, baths: 1, sqft: 1568, pets: true, status: 'New', found: found, link: z + '1', _lat: 45.5163, _lon: -122.5791, _geo: '101 Example St, Portland, OR'}, 2, 'zillow'),
+    mk('rentals', {address: '202 Sample Ave APT 4, Portland, OR', area: 'Mount Tabor area', search: 'Harrison Park School', rent: 2200, beds: 2, baths: 1, sqft: 942, pets: true, status: 'New', found: found, link: z + '2', _lat: 45.5052, _lon: -122.6084, _geo: '202 Sample Ave APT 4, Portland, OR'}, 2, 'zillow'),
     mk('rentals', {address: 'Address not shown, Portland, OR', area: 'Sellwood-Moreland', search: 'Sellwood Middle School', rent: 2995, beds: 3, baths: 3, sqft: 2246, status: 'New', found: found, link: z + '3'}, 2, 'zillow'),
-    mk('buy', {address: '303 Example Rd, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 764900, beds: 4, baths: 3, sqft: 2264, status: 'New', open: 'Sun Oct 11, 12pm-2pm', broker: 'Example Realty', found: found, link: z + '4'}, 2, 'zillow'),
-    mk('buy', {address: '404 Sample Cir, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 619500, beds: 4, baths: 2, sqft: 2073, status: 'New', cut: '$400 (9/17)', open: 'Fri Oct 9, 4pm-6pm / Sat Oct 10, 11am-1pm', broker: 'Sample Properties, LLC', found: found, link: z + '5'}, 2, 'zillow'),
-    mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Beaumont Middle School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6'}, 30, 'zillow'),
+    mk('buy', {address: '303 Example Rd, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 764900, beds: 4, baths: 3, sqft: 2264, status: 'New', open: 'Sun Oct 11, 12pm-2pm', broker: 'Example Realty', found: found, link: z + '4', _lat: 45.3611, _lon: -122.6352, _geo: '303 Example Rd, West Linn, OR'}, 2, 'zillow'),
+    mk('buy', {address: '404 Sample Cir, West Linn, OR', area: 'West Linn', search: 'Rosemont Ridge Middle School', price: 619500, beds: 4, baths: 2, sqft: 2073, status: 'New', cut: '$400 (9/17)', open: 'Fri Oct 9, 4pm-6pm / Sat Oct 10, 11am-1pm', broker: 'Sample Properties, LLC', found: found, link: z + '5', _lat: 45.3805, _lon: -122.6405, _geo: '404 Sample Cir, West Linn, OR'}, 2, 'zillow'),
+    mk('buy', {address: '505 Example Dr, Portland, OR', area: 'Grant High area', search: 'Beaumont Middle School', price: 615000, beds: 4, baths: 4, sqft: 2320, status: 'Like', broker: 'Example Realty', found: found, link: z + '6', _lat: 45.5521, _lon: -122.6188, _geo: '505 Example Dr, Portland, OR'}, 30, 'zillow'),
     mk('timeline', {date: '2027-06-01', what: 'Example: move window opens', who: 'Both'}, 50),
     mk('timeline', {date: '2026-11-15', what: 'Example: settle the rent budget', who: 'Jeffrey', done: true}, 49),
     mk('schools', {school: 'Example High School', level: 'High', district: 'Portland Public Schools', area: 'Grant High area', status: 'To look at'}, 40),
     mk('rentals', {address: '123 Example St', area: 'West Linn', hood: 'Willamette', rent: 2800, beds: 3, baths: 2, status: 'Like', link: 'https://example.com/listing'}, 30),
-    mk('rentals', {address: '456 Sample Ave', area: 'Sellwood-Moreland', rent: 2550, beds: 2, baths: 1, status: 'New'}, 29),
+    mk('rentals', {address: '456 Sample Ave', area: 'Sellwood-Moreland', rent: 2550, beds: 2, baths: 1, status: 'New', _geo: '456 Sample Ave'}, 29),
     mk('house', {task: 'Example: interview listing agents', category: 'Agent', who: 'Both', due: '2027-02-01'}, 20),
     mk('logistics', {task: 'Example: get three mover quotes', category: 'Movers', who: 'Jeffrey', due: '2027-04-15'}, 10),
     mk('notes', {title: 'Example note', body: 'Demo text. Nothing here is saved.'}, 5)
@@ -510,6 +564,7 @@ function drawMeta(){
 }
 
 function tabCount(t){
+  if (t.map) return '';
   if (t.jobs) return S.jobCounts ? S.jobCounts.queued : '';
   var rows = live(t.key);
   if (t.tasks) rows = rows.filter(function(r){ return !r.data.done; });
@@ -534,7 +589,14 @@ function goTab(key){
   if (bar && bar.getBoundingClientRect().top < 0) window.scrollTo({top: bar.offsetTop, behavior: 'smooth'});
 }
 
-function drawView(){ if (TAB[S.tab].jobs) drawJobs(); else drawSheetView(); }
+function drawView(){
+  dropMap();
+  var t = TAB[S.tab];
+  if (t.jobs) drawJobs(); else if (t.map) drawMapView(); else drawSheetView();
+}
+
+// after a change: the tab counts, the cover, and whichever view is open
+function redraw(){ drawTabs(); drawMeta(); if (TAB[S.tab].map) drawPins(false); else drawSheet(); }
 
 function hasCol(t, k){ return t.cols.some(function(c){ return c.k === k; }); }
 function colOf(t, k){ return t.cols.filter(function(c){ return c.k === k; })[0]; }
@@ -571,7 +633,7 @@ function matches(t, r){
   if (hasCol(t, 'area') && S.area && r.data.area !== S.area) return false;
   if (hasCol(t, 'search') && S.search && r.data.search !== S.search) return false;
   if (q){
-    var hay = Object.keys(r.data).map(function(k){ return r.data[k]; }).join(' ').toLowerCase();
+    var hay = Object.keys(r.data).filter(function(k){ return k.charAt(0) !== '_'; }).map(function(k){ return r.data[k]; }).join(' ').toLowerCase();
     if (hay.indexOf(q) < 0) return false;
   }
   return true;
@@ -808,10 +870,12 @@ async function listAction(id, act){
       var d = Object.assign({}, cur.data, {status: act === 'save' ? 'Like' : 'Passed'});
       return act === 'save' ? {data: d} : {data: d, archived: true};
     });
-  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); drawSheet(); return; }
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); redraw(); return; }
   if (act === 'save') S.fresh[id] = Date.now();
-  drawSheet(); drawTabs(); drawMeta();
-  toast(act === 'save' ? 'Saved. It’s in the list below.' : 'Passed. Show archived brings it back.', function(){ undoListAction(id, before); });
+  redraw();
+  var onMap = !!TAB[S.tab].map;
+  toast(act === 'save' ? (onMap ? 'Saved.' : 'Saved. It’s in the list below.') : (onMap ? 'Passed. It’s off the map.' : 'Passed. Show archived brings it back.'),
+    function(){ undoListAction(id, before); });
 }
 
 async function undoListAction(id, before){
@@ -823,7 +887,248 @@ async function undoListAction(id, before){
     });
   } catch (e){ return; }
   delete S.fresh[id];
-  drawSheet(); drawTabs(); drawMeta();
+  redraw();
+}
+
+/* ---------- map ---------- */
+
+// The Map tab: the same live map as the LSRI lab. MapLibre GL JS (BSD licence) draws OpenStreetMap data served by
+// OpenFreeMap (free, no key, no account, no cookies), recoloured to the board. The library loads only when the tab
+// opens. A home gets a pin once load_listing_emails.py has looked up its address (data._lat, _lon, and _geo = the
+// address it looked up); after the address is edited the pin waits for the next lookup.
+var MAP_LIB = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl';
+var MAP_SRI = {js: 'sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp', css: 'sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK'};
+var MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+var MAP_BOX = [-122.80, 45.33, -122.52, 45.60];          // Portland down to West Linn, until the pins set the view
+var MAP_KINDS = [['all', 'All homes'], ['rentals', 'Rentals'], ['buy', 'Houses to buy']];
+var M = {map: null, gl: null, markers: [], gen: 0, libP: null, styleP: null, fitted: false};
+
+// OpenFreeMap's light style, warmed to the board's paper, as in the lab
+var MAP_PAPER = '#F3EEE6', MAP_WATER = '#BFD7E3', MAP_CASE = '#D9CEBC';
+var MAP_PAINT = {
+  'background': {'background-color': MAP_PAPER},
+  'park': {'fill-color': '#D9E6CF'},
+  'water': {'fill-color': MAP_WATER},
+  'waterway': {'line-color': MAP_WATER},
+  'landuse_residential': {'fill-color': '#ECE5D9'},
+  'landcover_wood': {'fill-color': '#DFE8D3', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 12, 1]},
+  'building': {'fill-color': '#E6DED0', 'fill-outline-color': '#D8CEBE'},
+  'highway_path': {'line-color': '#E8E0D3'},
+  'highway_minor': {'line-color': '#FFFFFF', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.55, 13, 1]},
+  'highway_major_casing': {'line-color': MAP_CASE},
+  'highway_major_inner': {'line-color': '#FFFFFF'},
+  'highway_major_subtle': {'line-color': '#FFFFFF'},
+  'highway_motorway_casing': {'line-color': '#CDBEA5'},
+  'highway_motorway_inner': {'line-color': ['interpolate', ['linear'], ['zoom'], 5.8, 'rgba(251,240,219,0.6)', 6, '#FBF0DB']},
+  'highway_motorway_subtle': {'line-color': 'rgba(240,226,200,0.9)'},
+  'highway_motorway_bridge_casing': {'line-color': '#CDBEA5'},
+  'highway_motorway_bridge_inner': {'line-color': ['interpolate', ['linear'], ['zoom'], 5.8, 'rgba(251,240,219,0.6)', 6, '#FBF0DB']},
+  'railway': {'line-color': '#D3CABB'}, 'railway_dashline': {'line-color': '#F3EEE6'},
+  'boundary_3': {'line-color': '#B3A893'}, 'boundary_2': {'line-color': '#A0957F'}
+};
+var MAP_TEXT = {label_city: '#1B2430', label_city_capital: '#1B2430', label_town: '#1B2430', label_village: '#36404E', label_other: '#6A7280',
+  label_state: '#7F8794', airport: '#6A7280', 'highway-name-major': '#6A7280', 'highway-name-minor': '#7F8794', 'highway-name-path': '#7F8794',
+  water_name_point_label: '#46708A', water_name_line_label: '#46708A', waterway_line_label: '#46708A'};
+function mapRecolour(st){
+  delete st.sources.ne2_shaded;
+  st.layers = st.layers.filter(function(l){ return l.source !== 'ne2_shaded'; });
+  st.layers.forEach(function(l){
+    if (MAP_PAINT[l.id]) l.paint = Object.assign(l.paint || {}, MAP_PAINT[l.id]);
+    if (l.type === 'symbol' && !/shield/.test(l.id)){
+      l.paint = Object.assign(l.paint || {}, {'text-halo-color': 'rgba(243,238,230,0.92)', 'text-halo-width': 1.4, 'text-halo-blur': 0.4});
+      if (MAP_TEXT[l.id]) l.paint['text-color'] = MAP_TEXT[l.id];
+      if (l.layout && l.layout['text-size'] !== undefined) l.layout['text-size'] = mapBigger(l.layout['text-size'], 1.15);
+    }
+  });
+  // park names and a few landmarks, for bearings up close
+  var at = st.layers.map(function(l){ return l.id; }).indexOf('label_other');
+  st.layers.splice(at < 0 ? st.layers.length : at, 0,
+    {id: 'mv-park-name', type: 'symbol', source: 'openmaptiles', 'source-layer': 'park', minzoom: 12,
+     filter: ['all', ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false], ['has', 'name']],
+     layout: {'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['Noto Sans Italic'], 'text-size': 13, 'text-max-width': 7},
+     paint: {'text-color': '#55704B', 'text-halo-color': 'rgba(243,238,230,0.92)', 'text-halo-width': 1.4}},
+    {id: 'mv-landmark', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 13,
+     filter: ['all', ['match', ['get', 'class'], ['college', 'stadium', 'museum', 'attraction', 'theatre'], true, false], ['<=', ['get', 'rank'], 20]],
+     layout: {'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 12.5, 'text-max-width': 8},
+     paint: {'text-color': '#6A7280', 'text-halo-color': 'rgba(243,238,230,0.92)', 'text-halo-width': 1.4}});
+  return st;
+}
+function mapBigger(v, k){
+  var up = function(x){ return Math.round(x * k * 10) / 10; };
+  if (typeof v === 'number') return up(v);
+  if (Array.isArray(v) && v[0] === 'interpolate') return v.map(function(x, i){ return i >= 4 && i % 2 === 0 && typeof x === 'number' ? up(x) : x; });
+  if (Array.isArray(v) && v[0] === 'step') return v.map(function(x, i){ return i >= 2 && i % 2 === 0 && typeof x === 'number' ? up(x) : x; });
+  return v;
+}
+function mapLib(){
+  if (window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (!M.libP){
+    M.libP = new Promise(function(ok, no){
+      var css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = MAP_LIB + '.css'; css.integrity = MAP_SRI.css; css.crossOrigin = 'anonymous';
+      document.head.appendChild(css);
+      var sc = document.createElement('script');
+      sc.src = MAP_LIB + '.js'; sc.integrity = MAP_SRI.js; sc.crossOrigin = 'anonymous'; sc.async = true;
+      sc.onload = function(){ if (window.maplibregl) ok(window.maplibregl); else no(new Error('no map library')); };
+      sc.onerror = function(){ no(new Error('the map library did not load')); };
+      document.head.appendChild(sc);
+    });
+    M.libP.catch(function(){ M.libP = null; });
+  }
+  return M.libP;
+}
+function mapStyle(){
+  if (!M.styleP){
+    M.styleP = fetch(MAP_STYLE).then(function(r){ if (!r.ok) throw new Error('map style ' + r.status); return r.json(); }).then(mapRecolour);
+    M.styleP.catch(function(){ M.styleP = null; });
+  }
+  return M.styleP.then(function(st){ return JSON.parse(JSON.stringify(st)); });
+}
+
+function hasStreet(r){ return /^\d/.test(String(r.data.address || '').trim()); }
+function placed(r){ return r.data._lat != null && r.data._lon != null && r.data._geo === r.data.address; }
+// the homes the map's buttons and School search let through, with or without a pin; passed homes stay off
+function mapHomes(){
+  return S.rows.filter(function(r){
+    if ((r.tab !== 'rentals' && r.tab !== 'buy') || r.archived || r.data.status === 'Passed') return false;
+    if (S.mapKind !== 'all' && r.tab !== S.mapKind) return false;
+    return !S.search || r.data.search === S.search;
+  });
+}
+
+function drawMapView(){
+  var extra = valuesOf('rentals', 'search').concat(valuesOf('buy', 'search')).filter(function(v, i, a){ return SCHOOL_SEARCHES.indexOf(v) < 0 && a.indexOf(v) === i; });
+  $('#view').innerHTML =
+    '<div class="head"><h2>Map</h2></div>' +
+    '<p class="blurb">Rentals and houses to buy, with the schools behind the six searches. Click a pin for the details. New homes can be saved or passed right here.</p>' +
+    '<div class="tools"><div class="seg" role="group" aria-label="Homes shown">' + MAP_KINDS.map(function(k){
+      return '<button type="button" data-mapkind="' + k[0] + '" aria-pressed="' + (S.mapKind === k[0]) + '">' + esc(k[1]) + '</button>';
+    }).join('') + '</div>' +
+    '<select id="srch" aria-label="School search"><option value="">All school searches</option>' +
+      SCHOOL_SEARCHES.concat(extra).map(function(v){ return '<option' + (v === S.search ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + '</select>' +
+    '<label class="tg"><input type="checkbox" id="mapSchools"' + (S.mapSchools ? ' checked' : '') + '> Schools</label></div>' +
+    '<div class="mapwrap"><div id="map" class="mapbox" role="region" aria-label="Map of the homes and schools"></div></div>' +
+    '<div class="legend" aria-hidden="true"><span><span class="pin rent new"><i></i></span>Rental, new</span><span><span class="pin rent"><i></i></span>Rental, saved</span>' +
+    '<span><span class="pin buy new"><i></i></span>For sale, new</span><span><span class="pin buy"><i></i></span>For sale, saved</span>' +
+    '<span><span class="pin school"><i></i></span>School</span></div>' +
+    '<p class="mapnote" id="mapnote"></p>';
+  mapNote();
+  startMap();
+}
+
+function startMap(){
+  var gen = ++M.gen, box = $('#map');
+  if (!box) return;
+  if (!('WebGLRenderingContext' in window)){ mapMsg('This browser can’t draw the map.'); return; }
+  Promise.all([mapLib(), mapStyle()]).then(function(r){
+    if (gen !== M.gen || !document.body.contains(box)) return;
+    var gl = r[0];
+    var map = new gl.Map({container: box, style: r[1], bounds: MAP_BOX, fitBoundsOptions: {padding: 30}, maxZoom: 18,
+      maxPitch: 0, dragRotate: false, pitchWithRotate: false, touchPitch: false});
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+    map.addControl(new gl.NavigationControl({showCompass: false}), 'top-right');
+    M.map = map; M.gl = gl; M.fitted = false;
+    drawPins(true);
+  }).catch(function(){ if (gen === M.gen) mapMsg('The map didn’t load. Check the connection, then open the tab again.'); });
+}
+function mapMsg(text){ var w = $('.mapwrap'); if (w) w.insertAdjacentHTML('beforeend', '<div class="mapmsg">' + esc(text) + '</div>'); }
+function dropMap(){
+  M.gen++;
+  if (M.map){ try { M.map.remove(); } catch (e){} }
+  M.map = null; M.markers = [];
+}
+
+// every pin again (after a filter or a Save or Pass); fit moves the view to take them all in
+function drawPins(fit){
+  mapNote();
+  var map = M.map, gl = M.gl;
+  if (!map) return;
+  M.markers.forEach(function(m){ m.remove(); });
+  M.markers = [];
+  var pts = [], seen = {};
+  function add(el, lon, lat, html, label){
+    var at = lon.toFixed(5) + ',' + lat.toFixed(5), nth = seen[at] = (seen[at] || 0) + 1;
+    el.setAttribute('aria-label', label);
+    el.setAttribute('role', 'button');
+    var pop = new gl.Popup({offset: 14, maxWidth: '320px'}).setHTML(html);
+    M.markers.push(new gl.Marker({element: el, offset: nth > 1 ? [Math.round(Math.cos(nth * 2.3) * 12), Math.round(Math.sin(nth * 2.3) * 12)] : [0, 0]})
+      .setLngLat([lon, lat]).setPopup(pop).addTo(map));
+  }
+  if (S.mapSchools) SCHOOL_PINS.forEach(function(sc){
+    if (sc.lat == null) return;
+    var off = S.search && S.search !== sc.search;
+    var el = document.createElement('div');
+    el.className = 'pin school' + (off ? ' dim' : '');
+    el.innerHTML = '<i></i><span>' + esc(sc.short) + '</span>';
+    add(el, sc.lon, sc.lat, schoolPop(sc), 'School: ' + sc.name);
+    if (!off) pts.push([sc.lon, sc.lat]);
+  });
+  // saved homes first, so the new ones sit on top
+  mapHomes().filter(placed).sort(function(a, b){ return (queued(a) ? 1 : 0) - (queued(b) ? 1 : 0); }).forEach(function(r){
+    var rent = r.tab === 'rentals', isNew = queued(r), price = money(rent ? r.data.rent : r.data.price);
+    var el = document.createElement('div');
+    el.className = 'pin ' + (rent ? 'rent' : 'buy') + (isNew ? ' new' : '');
+    el.innerHTML = '<i></i>';
+    add(el, r.data._lon, r.data._lat, homePop(r), (rent ? 'Rental' : 'For sale') + (isNew ? ', new: ' : ': ') + (r.data.address || '') + (price ? ', ' + price + (rent ? ' a month' : '') : ''));
+    pts.push([r.data._lon, r.data._lat]);
+  });
+  if (fit && pts.length){
+    var b = pts.reduce(function(a, q){ return [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])]; }, [180, 90, -180, -90]);
+    map.fitBounds(b, {padding: {top: 50, bottom: 60, left: 40, right: 110}, maxZoom: 14, duration: M.fitted ? 600 : 0});
+    M.fitted = true;
+  }
+}
+
+function homePop(r){
+  var d = r.data, rent = r.tab === 'rentals', u = safeUrl(d.link), isNew = queued(r), price = money(rent ? d.rent : d.price);
+  var facts = [price ? price + (rent ? '/mo' : '') : '', d.beds != null && d.beds !== '' ? d.beds + ' bd' : '',
+    d.baths != null && d.baths !== '' ? d.baths + ' ba' : '', d.sqft ? Number(d.sqft).toLocaleString('en-US') + ' sq ft' : '', d.pets ? 'pets OK' : ''];
+  return '<div class="pop" data-lid="' + esc(r.id) + '"><p class="pk">' + (rent ? 'Rental' : 'For sale') + ' · ' + esc(isNew ? 'new' : (d.status || 'saved')) + '</p>' +
+    '<h3>' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(d.address) + '</a>' : esc(d.address)) + '</h3>' +
+    '<p class="lp">' + facts.filter(Boolean).map(esc).join(' · ') + '</p>' +
+    (d.open ? '<p class="lx"><span class="pill">Open house</span> ' + esc(d.open) + '</p>' : '') +
+    (d.cut ? '<p class="lx"><span class="pill">Price cut</span> ' + esc(d.cut) + '</p>' : '') +
+    '<p class="jm">' + [d.search ? d.search + ' search' : '', d.found ? 'found ' + day(d.found) : ''].filter(Boolean).map(esc).join(' · ') + '</p>' +
+    (isNew ? '<div class="acts"><button class="btn small primary" data-list="save">Save</button><button class="btn small quiet" data-list="pass">Pass</button></div>' : '') +
+    '<p class="pl">' + (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Open on ' + esc(FEEDS[r.source] || 'the listing') + '</a>' : '') +
+    '<button type="button" class="lnk" data-showrow="' + esc(r.id) + '">Show in ' + esc(TAB[r.tab].label) + '</button></p></div>';
+}
+
+function schoolPop(sc){
+  var n = S.rows.filter(function(r){ return (r.tab === 'rentals' || r.tab === 'buy') && !r.archived && r.data.status !== 'Passed' && r.data.search === sc.search; }).length;
+  var only = S.search === sc.search;
+  return '<div class="pop"><p class="pk">School</p><h3><a href="' + esc(sc.url) + '" target="_blank" rel="noopener noreferrer">' + esc(sc.name) + '</a></h3>' +
+    '<p class="lx">' + esc(sc.addr) + '</p><p class="jm">' + n + ' home' + (n === 1 ? '' : 's') + ' from the ' + esc(sc.search) + ' search</p>' +
+    '<div class="acts"><button class="btn small quiet" data-mapsearch="' + esc(only ? '' : sc.search) + '">' + (only ? 'Show every search' : 'Show only this search') + '</button></div></div>';
+}
+
+// under the map: what's on it, and what isn't and why
+function mapNote(){
+  var el = $('#mapnote'); if (!el) return;
+  var hs = mapHomes(), on = hs.filter(placed).length;
+  var noStreet = hs.filter(function(r){ return !placed(r) && !hasStreet(r); }).length;
+  var tried = hs.filter(function(r){ return !placed(r) && hasStreet(r) && r.data._geo === r.data.address; });
+  var waiting = hs.filter(function(r){ return !placed(r) && hasStreet(r) && r.data._geo !== r.data.address; }).length;
+  var out = [on + ' home' + (on === 1 ? '' : 's') + ' on the map.'];
+  if (noStreet) out.push(noStreet + ' without a street address, so no pin.');
+  if (waiting) out.push(waiting + ' not placed yet: ' + (waiting === 1 ? 'it gets' : 'they get') + ' a pin the next time listings are loaded.');
+  if (tried.length) out.push('The address lookup couldn’t place ' + tried.map(function(r){ return r.data.address; }).join('; ') + '.');
+  var noSchool = S.mapSchools ? SCHOOL_PINS.filter(function(sc){ return sc.lat == null && (!S.search || S.search === sc.search); }) : [];
+  if (noSchool.length) out.push(noSchool.map(function(sc){ return sc.name; }).join(', ') + ' isn’t on the map: the Census address data doesn’t have ' + noSchool.map(function(sc){ return sc.addr.split(',')[0]; }).join(', ') + '.');
+  el.textContent = out.join(' ');
+}
+
+// from a pin to the home's own tab: a new one is in the New list, a saved one is lit at the top of the sheet
+function showRow(id){
+  var r = S.rows.filter(function(x){ return x.id === id; })[0];
+  if (!r) return;
+  S.area = '';
+  goTab(r.tab);
+  var isNew = queued(r);
+  if (!isNew){ S.fresh[id] = Date.now(); drawSheet(); }
+  var el = document.querySelector(isNew ? '.queue [data-lid="' + CSS.escape(id) + '"]' : 'tr[data-id="' + CSS.escape(id) + '"]');
+  if (el){ el.classList.add('hl'); el.scrollIntoView({block: 'center'}); }
 }
 
 /* ---------- CSV ---------- */
@@ -961,6 +1266,17 @@ document.addEventListener('click', async function(e){
     lc.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
     listAction(lc.dataset.lid, b.dataset.list); return;
   }
+  if (b.dataset.mapkind){
+    S.mapKind = b.dataset.mapkind;
+    b.parentNode.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+    drawPins(true); return;
+  }
+  if (b.hasAttribute('data-mapsearch')){
+    S.search = b.getAttribute('data-mapsearch');
+    var sel = $('#srch'); if (sel) sel.value = S.search;
+    drawPins(true); return;
+  }
+  if (b.dataset.showrow){ showRow(b.dataset.showrow); return; }
   var act = b.dataset.act; if (!act) return;
   if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
   if (act === 'add'){ addRow(); return; }
@@ -973,7 +1289,8 @@ document.addEventListener('click', async function(e){
 document.addEventListener('change', function(e){
   var el = e.target;
   if (el.id === 'area'){ S.area = el.value; drawSheet(); return; }
-  if (el.id === 'srch'){ S.search = el.value; drawSheet(); return; }
+  if (el.id === 'srch'){ S.search = el.value; if (TAB[S.tab].map) drawPins(true); else drawSheet(); return; }
+  if (el.id === 'mapSchools'){ S.mapSchools = el.checked; drawPins(false); return; }
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
   var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id]');
@@ -1007,7 +1324,7 @@ document.addEventListener('visibilitychange', async function(){
   try {
     S.rows = await api.rows(); S.loadedAt = Date.now();
     drawMeta(); drawTabs();
-    if (!TAB[S.tab].jobs) drawSheet(); else loadJobCounts();
+    if (TAB[S.tab].map) drawPins(false); else if (!TAB[S.tab].jobs) drawSheet(); else loadJobCounts();
   } catch (e){}
 });
 
