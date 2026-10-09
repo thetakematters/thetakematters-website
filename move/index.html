@@ -23,6 +23,13 @@
   Jobs: Applied lists the jobs marked applied, each with a result (Waiting to hear,
   Interview, Offer, Passed over), the date applied and a note. Those live in move_rows
   (tab 'applications', ext_id 'job-<id>'), so the job scan never touches them.
+  Jobs has a tab for each of them. Jeffrey's reads the job scan tables. Paige's reads
+  move_rows: her scan (Job Search/Paige/paige_scan.py, run by jobscan) adds landscape
+  jobs as tab 'paige_jobs' (data.status queued, applied, passed or closed; her result,
+  date applied and note sit in the same row) and one 'paige_scan' row with the last
+  run's summary for Where it looks and Reach out (the firms to contact directly; their emails
+  live in that row, not in this page). Titles and firms added there are rows in
+  'paige_titles' and 'paige_firms'. #paige opens her tab.
   Same look as the Oregon Sound Circuit notebook. Local preview with demo data:
   http://localhost:PORT/move/?demo (localhost only, nothing is saved).
 -->
@@ -269,6 +276,30 @@ table.sheet{border-collapse:collapse;width:100%}
 .jc.o-passed-over .sch h3 a{color:var(--slate)}
 .sc.unfolded .ssec.fold .v{display:block;overflow:visible}
 
+/* Jobs: a tab for each of them, and Paige's Where it looks */
+.whos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
+.whos button{display:inline-flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--line2);border-radius:12px;padding:7px 18px 8px;font:500 23px/1.2 var(--serif);color:var(--ink);cursor:pointer}
+.whos button:hover{border-color:var(--ink)}
+.whos .c{font:500 13px/1.4 var(--mono);color:var(--ink3);background:var(--mist);border-radius:10px;padding:1px 8px}
+.whos button[aria-pressed=true]{background:var(--navy);border-color:var(--navy);color:#fff}
+.whos button[aria-pressed=true] .c{background:rgba(255,255,255,.14);color:var(--sky)}
+.wsec{margin:0 0 28px}
+.wsec .lh{margin:0 0 8px}
+.wv{margin:0 0 10px;max-width:860px}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.wi{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:12px 14px;min-width:0}
+.wi .wn{font-weight:600;margin:0 0 2px;overflow-wrap:anywhere}
+.wi .wx{color:var(--slate);font-size:14.5px;margin:0 0 6px;overflow-wrap:anywhere}
+.wi .ws{font:500 12.5px/1.4 var(--mono);letter-spacing:.04em;color:var(--ink3);margin:0}
+.wi .ws.bad{color:var(--coral-t)}
+.wi .wl{font-weight:600;margin:0 0 6px;overflow-wrap:anywhere}
+.wadd{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 10px}
+.wadd input{border:1.5px solid var(--line2);background:#fff;border-radius:10px;padding:7px 11px;font-size:15px;min-width:0;flex:1 1 220px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.tag{display:inline-flex;align-items:center;gap:2px;background:var(--teal-tint);border:1px solid #C7E0E0;border-radius:999px;padding:3px 4px 3px 12px;font-size:14.5px;font-weight:600;color:var(--teal-t)}
+.tag.fixed{padding-right:12px}
+.tag .mini{padding:1px 7px;color:var(--teal-t)}
+
 /* undo toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:12px;font-size:15px;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:calc(100vw - 32px)}
 .toast button{background:none;border:1.5px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;padding:3px 10px;font-weight:600;cursor:pointer}
@@ -311,6 +342,8 @@ table.sheet{border-collapse:collapse;width:100%}
   .sheet tr.arch{background:var(--mist)}
   .edited{font-size:13px}
   .sheet input,.sheet select,.sheet textarea{font-size:16px}
+  .whos button{font-size:20px;padding:6px 14px 7px}
+  .wadd input{font-size:16px}
 }
 </style>
 </head>
@@ -453,6 +486,7 @@ TABS.forEach(function(t){ TAB[t.key] = t; });
 
 var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, editing: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null, jobQ: '',
+         jobsWho: '', pView: 'queued', pQ: '',
          loadedAt: 0, saving: 0, saveErr: ''};
 
 // Homes loaded from the listing alerts. One still marked New waits in the tab's New list.
@@ -560,6 +594,33 @@ function demoApi(){
     {id: 6, employer_name: 'Example County', title: 'Example Budget Analyst', location: 'Hillsboro, OR', status: 'user_rejected', canonical_url: 'https://example.com/job/6', first_seen: iso(50), updated_at: iso(4)}
   ];
   rows.push((function(){ var r = mk('applications', {job_id: 3, applied_on: '2026-09-20', outcome: 'Passed over', note: 'Example: the job site says no longer under consideration.'}, 70); r.source = 'jobs'; r.ext_id = 'job-3'; return r; })());
+  // Paige's scan: jobs, and the last run's summary for Where it looks
+  function pj(data, h){ var r = mk('paige_jobs', Object.assign({found: found, status: 'queued'}, data), h); r.source = 'paige_scan'; r.ext_id = 'demo:' + n; r.created_by = r.updated_by = 'job scan'; return r; }
+  rows.push(
+    pj({title: 'Example Landscape Architect (4-8 Years)', employer: 'Example Landscape Studio', place: 'Portland, OR', url: 'https://example.com/pjob/1', src: 'Example Landscape Studio'}, 3),
+    pj({title: 'Senior Landscape Architect | Project Manager', employer: 'Example Architects', place: 'Portland, OR', url: 'https://example.com/pjob/2', src: 'Example Architects', hybrid: true}, 3),
+    pj({title: 'Landscape Architect/Designer', employer: 'Example Design Group', place: 'Portland, OR', url: 'https://example.com/pjob/3', src: 'Example Design Group', level: 'Mid-Level'}, 3),
+    pj({title: 'Interdisciplinary', employer: 'Example Federal Agency', place: 'Portland, Oregon', url: 'https://example.com/pjob/4', pay: '$126K-$184K', src: 'USAJobs',
+      about: 'Federal job in the landscape architecture series (0807), so the title can be general.'}, 3),
+    pj({title: 'Example Parks Project Manager', employer: 'Example Park District', place: 'Beaverton, OR', url: 'https://example.com/pjob/5', pay: '$98K-$128K', src: 'governmentjobs.com',
+      status: 'applied', applied_on: '2026-10-01', outcome: 'Interview', note: 'Example: phone screen Oct 14.'}, 200),
+    pj({title: 'Example Landscape Architect 2', employer: 'Example City', place: 'Tigard, OR', url: 'https://example.com/pjob/6', pay: '$92K-$110K', src: 'governmentjobs.com', status: 'passed'}, 300));
+  rows.push((function(){
+    var r = mk('paige_scan', {ran_at: iso(1), added: 4, closed: 0,
+      rules: 'Example rules text. Landscape Architect titles anywhere. Project Manager titles at landscape firms, or where the title says landscape or parks.',
+      titles: ['Landscape Architect', 'Project Manager'],
+      sources: [{key: 'a', name: 'Example Landscape Studio', kind: 'studio', url: 'https://example.com/careers', note: 'Their own careers page.', read: 5, kept: 2, new: 2, error: ''},
+                {key: 'b', name: 'Example Engineering Firm', kind: 'multi', url: 'https://example.com/jobs', note: 'Greenhouse job board.', read: 82, kept: 0, new: 0, error: ''},
+                {key: 'c', name: 'Example Firm With A Problem', kind: 'multi', url: 'https://example.com/x', note: 'Their own careers page.', read: 0, kept: 0, new: 0, error: 'the careers page changed: no job list found'},
+                {key: 'gj', name: 'governmentjobs.com', kind: 'public', url: 'https://example.com/gj', note: 'Example public agencies.', read: 11, kept: 0, new: 0, error: ''}],
+      reach_out: [{name: 'Example Studio', url: 'https://example.com/studio', how: 'Send a letter of interest, resume and portfolio.', email: 'jobs@example.com', note: 'No job list on their site.'},
+                  {name: 'Example Firm', url: 'https://example.com/firm', how: 'Their job openings in Portland.', link: 'https://example.com/firm/jobs', link_label: 'Portland jobs', note: 'Check by hand.'},
+                  {name: 'Example Design-Build', url: 'https://example.com/db', how: 'Apply through their career form.', link: 'https://example.com/db/form', link_label: 'Career form', note: ''}],
+      unreached: ['Example Unreached (their site didn’t answer)'],
+      not_visited: ['Example One', 'Example Two']}, 1);
+    r.source = 'paige_scan'; r.ext_id = 'last-run'; return r;
+  })());
+  rows.push(mk('paige_titles', {title: 'Example Park Planner'}, 2));
   var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', amount_raw: '$10,000 - $50,000',
     description: 'Demo opportunity. Example text long enough to fold: it funds projects that bring people together around the arts, with a match required and a letter of intent due first. Nothing here is real.'},
     {id: 2, kind: 'grant', title: 'Example project grant (2027)', org: 'Example county arts group', location: 'Portland area', url: 'https://example.com/grant-2', deadline: null, status: 'new',
@@ -643,6 +704,9 @@ async function boot(){
 function renderApp(){
   var h = location.hash.slice(1);
   if (TAB[h]) S.tab = h;
+  if (h === 'paige'){ S.tab = 'jobs'; S.jobsWho = 'paige'; }
+  // Jobs opens on your own tab: Paige's for her, Jeffrey's for him
+  if (!S.jobsWho) S.jobsWho = whoOf(S.user.email) === 'Paige' ? 'paige' : 'jeffrey';
   $('#root').innerHTML =
     (DEMO ? '<div class="demo">Demo data on this computer only. Nothing is saved.</div>' : '') +
     '<header class="mast"><div class="wrap"><span class="brand">Portland move</span><div class="mast-r"><span class="who">' + esc(S.user.email) +
@@ -674,7 +738,7 @@ function drawMeta(){
       if (t.liked.indexOf(r.data.status) >= 0) liked++;
     });
   });
-  var q = S.jobCounts ? S.jobCounts.queued : null;
+  var q = S.jobCounts ? S.jobCounts.queued + pRows('queued').length : null;
   el.innerHTML =
     '<button data-go="timeline"><span class="k">Next on the timeline</span><b>' + esc(next ? (day(next.data.date) || 'No date') : 'Nothing yet') + '</b><span class="s">' + esc(next ? (next.data.what || '') : 'Add the first date') + '</span></button>' +
     '<button data-go="' + (house || !logi ? 'house' : 'logistics') + '"><span class="k">Open to-dos</span><b>' + (house + logi) + '</b><span class="s">' + house + ' house · ' + logi + ' logistics</span></button>' +
@@ -684,7 +748,7 @@ function drawMeta(){
 
 function tabCount(t){
   if (t.map) return '';
-  if (t.jobs) return S.jobCounts ? S.jobCounts.queued : '';
+  if (t.jobs) return S.jobCounts ? S.jobCounts.queued + pRows('queued').length : '';
   var rows = live(t.key);
   if (t.tasks) rows = rows.filter(function(r){ return !r.data.done; });
   return rows.length;
@@ -1436,19 +1500,36 @@ async function loadJobCounts(){
     var c = await Promise.all([api.jobCount(['queued']), api.jobCount(['applied']), api.jobCount(['user_rejected']), api.oppCount()]);
     S.jobCounts = {queued: c[0], applied: c[1], passed: c[2], opps: c[3]};
   } catch (e){ S.jobCounts = null; }
-  drawMeta(); drawTabs(); drawJobChips();
+  drawMeta(); drawTabs(); drawJobChips(); drawWhos();
 }
 
+// the cover card's line: each queue, then interviews for either of them
 function jobsLine(){
   var c = S.jobCounts;
-  if (!c || !c.applied) return 'From the job scan';
-  var iv = S.rows.filter(function(r){ return r.tab === 'applications' && !r.archived && r.data.outcome === 'Interview'; }).length;
-  return c.applied + ' applied' + (iv ? ' · ' + iv + ' interview' + (iv > 1 ? 's' : '') : '');
+  var iv = S.rows.filter(function(r){ return !r.archived && r.data.outcome === 'Interview' && (r.tab === 'applications' || (r.tab === 'paige_jobs' && r.data.status === 'applied')); }).length;
+  return (c ? 'Jeffrey ' + c.queued + ' · ' : '') + 'Paige ' + pRows('queued').length + (iv ? ' · ' + iv + ' interview' + (iv > 1 ? 's' : '') : '');
 }
 
 function drawJobs(){
   $('#view').innerHTML = '<div class="head"><h2>Jobs</h2></div>' +
-    '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads from grantscan.</p>' +
+    '<div class="whos" role="group" aria-label="Whose jobs" id="whos"></div><div id="jbody"></div>';
+  drawWhos(); drawJobBody();
+}
+
+// a tab for each of them; the number is what's waiting in that queue
+function drawWhos(){
+  var el = $('#whos'); if (!el) return;
+  var jq = S.jobCounts ? S.jobCounts.queued : null;
+  el.innerHTML = [['jeffrey', 'Jeffrey', jq], ['paige', 'Paige', pRows('queued').length]].map(function(x){
+    return '<button type="button" data-who="' + x[0] + '" aria-pressed="' + (S.jobsWho === x[0]) + '">' + x[1] +
+      (x[2] != null ? '<span class="c">' + x[2] + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+function drawJobBody(){
+  var el = $('#jbody'); if (!el) return;
+  if (S.jobsWho === 'paige'){ drawPaige(); return; }
+  el.innerHTML = '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads from grantscan.</p>' +
     '<div class="chips" id="jchips"></div><div id="jtools"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
   drawJobChips(); drawJobTools(); loadJobList();
 }
@@ -1634,6 +1715,198 @@ async function oppAction(id, status){
   loadJobCounts();
 }
 
+/* ---------- Paige's jobs (her landscape scan) ---------- */
+
+// Her scan writes these rows; this page only changes status, result, date applied and note.
+function pRows(st){ return live('paige_jobs').filter(function(r){ return r.data.status === st; }); }
+function pRow(id){ return S.rows.filter(function(r){ return r.id === id; })[0]; }
+function pSummary(){ return live('paige_scan').filter(function(r){ return r.ext_id === 'last-run'; }).map(function(r){ return r.data; })[0] || null; }
+var P_RULES = 'Landscape Architect titles anywhere. Project Manager titles at landscape firms, or where the title, department or employer says landscape or parks. Mid to senior: junior, intern, entry-level and assistant titles are left out. Portland metro on the Oregon side, or remote. Pay of $90,000 or more when the posting lists it. Vancouver is out for now.';
+
+function drawPaige(){
+  var el = $('#jbody'); if (!el) return;
+  el.innerHTML = '<p class="blurb">Paige’s scan: Landscape Architect and Project Manager jobs, mid to senior level, around Portland, at $90,000 or more when the pay is listed. ' +
+    'Applied moves a job to Applied, where you can mark what happened. Pass moves it to Passed. Reach out lists the firms that take applications directly, and how. Where it looks shows what the scan reads.</p>' +
+    '<div class="chips" id="pchips"></div><div id="ptools"></div><div id="plist"></div>';
+  drawPChips(); drawPTools(); drawPList();
+}
+
+function drawPChips(){
+  var el = $('#pchips'); if (!el) return;
+  el.innerHTML = [['queued', 'Queued', pRows('queued').length], ['applied', 'Applied', pRows('applied').length],
+                  ['passed', 'Passed', pRows('passed').length], ['reach', 'Reach out', pSummary() && pSummary().reach_out ? pSummary().reach_out.length : null],
+                  ['where', 'Where it looks', null]].map(function(x){
+    return '<button class="chip' + (S.pView === x[0] ? ' on' : '') + '" data-pview="' + x[0] + '">' + x[1] +
+      (x[2] != null ? '<span class="c">' + x[2] + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+// the search box only shows on Passed; drawn once so typing keeps the cursor
+function drawPTools(){
+  var el = $('#ptools'); if (!el) return;
+  if (S.pView !== 'passed'){ el.innerHTML = ''; return; }
+  if (!$('#pq', el)) el.innerHTML = '<div class="tools"><input type="search" id="pq" placeholder="Find a job you passed: title or employer" aria-label="Find a passed job" value="' + esc(S.pQ) + '"></div>';
+}
+
+function drawPList(){
+  var el = $('#plist'); if (!el) return;
+  if (S.pView === 'where'){ el.innerHTML = whereHtml(); return; }
+  if (S.pView === 'reach'){ el.innerHTML = reachHtml(); return; }
+  var list = pRows(S.pView), q = S.pQ.trim().toLowerCase(), note = '';
+  if (S.pView === 'applied'){
+    var rank = {'Interview': 0, 'Offer': 1, 'Waiting to hear': 2, 'Passed over': 3};
+    list.sort(function(a, b){
+      var ra = rank[a.data.outcome || 'Waiting to hear'], rb = rank[b.data.outcome || 'Waiting to hear'];
+      return ra !== rb ? ra - rb : String(b.data.applied_on || '').localeCompare(String(a.data.applied_on || ''));
+    });
+  } else if (S.pView === 'passed'){
+    if (q) list = list.filter(function(r){ return (r.data.title + ' ' + r.data.employer).toLowerCase().indexOf(q) >= 0; });
+    list.sort(function(a, b){ return String(b.updated_at).localeCompare(String(a.updated_at)); });
+    note = q ? 'Matching passed jobs, most recently passed first.' : 'The last 100 passed, most recent first. Search for older ones.';
+    list = list.slice(0, 100);
+  } else {
+    list.sort(function(a, b){ return String(b.data.found || '').localeCompare(String(a.data.found || '')) || String(a.data.title).localeCompare(String(b.data.title)); });
+  }
+  if (!list.length){
+    el.innerHTML = '<div class="empty">' + (S.pView === 'queued' ? (pSummary() ? 'Nothing new. Each jobscan run looks again.' : 'Her scan hasn’t run yet. Run jobscan and new jobs land here.')
+      : S.pView === 'passed' && q ? 'No passed job matches that.' : 'Nothing here.') + '</div>';
+    return;
+  }
+  el.innerHTML = (S.pView === 'applied' ? '<p class="appsum" id="pappsum"></p>' : note ? '<p class="appsum">' + note + '</p>' : '') +
+    '<div class="scards">' + list.map(pCard).join('') + '</div>';
+  drawPAppSum();
+}
+
+function drawPAppSum(){
+  var el = $('#pappsum'); if (!el) return;
+  var rows = pRows('applied'), n = {};
+  rows.forEach(function(r){ var o = r.data.outcome || 'Waiting to hear'; n[o] = (n[o] || 0) + 1; });
+  el.textContent = rows.length + ' applied: ' + OUTCOMES.filter(function(o){ return n[o]; }).map(function(o){ return n[o] + ' ' + o.toLowerCase(); }).join(', ') + '.';
+}
+
+// Same card as Jeffrey's jobs: title linked to the posting, employer and place, a few lines, the buttons, when it was found.
+function pCard(r){
+  var d = r.data, id = ' data-pid="' + esc(r.id) + '"', st = d.status;
+  var j = {id: esc(r.id), title: d.title, canonical_url: d.url, employer_name: d.employer, status: st,
+           location: [d.place || 'Location not listed', d.hybrid ? 'Hybrid' : '', d.remote ? 'Remote' : ''].filter(Boolean).join(' · ')};
+  var lines = (d.pay ? jline('Pay', esc(d.pay)) : '') + (d.level ? jline('Level', esc(d.level)) : '') + (d.about ? jline('About', esc(d.about)) : '');
+  var foot = '<span class="edited">Found ' + esc(day(d.found)) + (d.src && d.src !== d.employer ? ' · via ' + esc(d.src) : '') + '</span>';
+  if (st === 'applied'){
+    var out = d.outcome || 'Waiting to hear';
+    var result = '<div class="ssel"><select data-pk="outcome"' + id + ' aria-label="Result">' + OUTCOMES.map(function(o){
+      return '<option' + (o === out ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>';
+    lines += '<span class="k2">Applied</span><div class="sv"><input type="date" data-pk="applied_on"' + id + ' value="' + esc(d.applied_on || '') + '" aria-label="Date applied"></div>' +
+      '<span class="k2">Note</span><div class="sv"><input type="text" data-pk="note"' + id + ' value="' + esc(d.note || '') + '" placeholder="Interview date, who you talked to" aria-label="Note"></div>';
+    return jobShell(j, 'app o-' + oslug(out), result, lines, postingBtn(j),
+      foot + '<span class="sp"></span><button class="mini" data-pset="queued"' + id + '>Back to the queue</button>');
+  }
+  if (st === 'passed') return jobShell(j, 'passed', '<span class="jpill">Passed</span>', lines,
+    '<button class="btn small primary" data-pset="applied"' + id + '>Mark applied</button><button class="btn small quiet" data-pset="queued"' + id + '>Back to the queue</button>' + postingBtn(j), foot);
+  return jobShell(j, '', '', lines,
+    '<button class="btn small primary" data-pset="applied"' + id + '>Applied</button><button class="btn small quiet" data-pset="passed"' + id + '>Pass</button>' + postingBtn(j), foot);
+}
+
+function pRedraw(){ drawPChips(); drawPList(); drawWhos(); drawMeta(); drawTabs(); }
+
+async function pSet(id, status, undoable){
+  var r = pRow(id); if (!r) return;
+  var prev = r.data.status;
+  try {
+    await mutate(id, function(cur){
+      var d = Object.assign({}, cur.data, {status: status});
+      if (status === 'applied' && !d.applied_on) d.applied_on = today();
+      return {data: d};
+    });
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); pRedraw(); return; }
+  pRedraw();
+  if (undoable !== false){
+    var words = {applied: 'Marked applied.', passed: 'Passed.', queued: 'Back in the queue.'};
+    toast(words[status] || 'Saved.', function(){ pSet(id, prev, false); });
+  }
+}
+
+async function pSave(id, k, v){
+  try {
+    await mutate(id, function(cur){
+      var d = Object.assign({}, cur.data);
+      if (v === '' || v == null) delete d[k]; else d[k] = v;
+      return {data: d};
+    });
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); return; }
+  if (k === 'outcome'){
+    var card = document.querySelector('.jc[data-card="' + CSS.escape(id) + '"]');
+    if (card) card.className = 'sc jc app o-' + oslug(v || 'Waiting to hear');
+    drawPAppSum(); drawMeta();
+  }
+}
+
+function pSec(title, inner){ return '<section class="wsec"><h3 class="lh">' + title + '</h3>' + inner + '</section>'; }
+function pLink(name, url){ var u = safeUrl(url); return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(name) + '</a>' : esc(name); }
+function mailLink(addr){ return /^[^@\s"<>]+@[^@\s"<>]+\.[a-z]{2,}$/i.test(addr || '') ? '<a href="mailto:' + esc(addr) + '">' + esc(addr) + '</a>' : ''; }
+
+// Reach out: firms with no job list the scan can read, and how to reach each one. The list
+// comes from her scan's summary row (REACH_OUT in paige_scan.py), so the emails aren't in this page.
+function reachHtml(){
+  var s = pSummary();
+  if (!s || !s.reach_out) return '<div class="empty">This fills in after the next jobscan run.</div>';
+  var h = '<p class="wv">These firms don’t post a job list the scan can read. Most take applications directly.</p><div class="wgrid">' +
+    s.reach_out.map(function(x){
+      var act = x.email ? mailLink(x.email) : x.link ? pLink(x.link_label || 'Open', x.link) : '';
+      return '<div class="wi"><p class="wn">' + pLink(x.name, x.url) + '</p>' + (x.how ? '<p class="wx">' + esc(x.how) + '</p>' : '') +
+        (act ? '<p class="wl">' + act + '</p>' : '') + (x.note ? '<p class="ws">' + esc(x.note) + '</p>' : '') + '</div>';
+    }).join('') + '</div>';
+  if ((s.unreached || []).length) h += '<p class="wv" style="margin-top:16px">Not reached yet: ' + esc(s.unreached.join('; ')) + '.</p>';
+  return h;
+}
+
+// Where it looks: what the last run read, and the titles and firms you add.
+function whereHtml(){
+  var s = pSummary(), titles = live('paige_titles'), firms = live('paige_firms');
+  function src(x){
+    return '<div class="wi"><p class="wn">' + pLink(x.name, x.url) + '</p>' + (x.note ? '<p class="wx">' + esc(x.note) + '</p>' : '') +
+      (x.error ? '<p class="ws bad">Couldn’t read it last time: ' + esc(x.error) + '</p>'
+               : '<p class="ws">' + x.read + ' listed · ' + x.kept + ' fit</p>') + '</div>';
+  }
+  var h = s ? '<p class="appsum">Last scan ' + esc(new Date(s.ran_at).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})) +
+      ': ' + s.added + ' new, ' + s.closed + ' closed.</p>'
+    : '<div class="empty" style="margin:0 0 22px">Her scan hasn’t run yet. After the first jobscan, this lists every firm and job site it reads and what it found.</div>';
+  h += pSec('What it keeps', '<p class="wv">' + esc(s && s.rules || P_RULES) + '</p>' +
+    '<div class="tags"><span class="tag fixed">Landscape Architect</span><span class="tag fixed">Project Manager</span>' +
+    titles.map(function(r){ return '<span class="tag">' + esc(r.data.title) + '<button class="mini" data-act="parch" data-rid="' + esc(r.id) + '" aria-label="Remove ' + esc(r.data.title) + '">×</button></span>'; }).join('') + '</div>' +
+    '<div class="wadd"><input type="text" id="ptitle" placeholder="Add a job title, like Park Planner" aria-label="Add a job title"><button class="btn small" data-act="ptitle">Add title</button></div>' +
+    '<p class="wx" style="color:var(--slate);margin:0">A title added here counts from the next jobscan run.</p>');
+  if (s){
+    h += pSec('Firms it reads', '<div class="wgrid">' + s.sources.filter(function(x){ return x.kind !== 'public'; }).map(src).join('') + '</div>');
+    h += pSec('Job sites it searches', '<div class="wgrid">' + s.sources.filter(function(x){ return x.kind === 'public'; }).map(src).join('') + '</div>');
+    h += pSec('Not read by the scan', '<p class="wv">Firms with no job list it can read are under Reach out, with how to apply to each.' +
+      ((s.not_visited || []).length ? ' Found in web searches but not checked yet: ' + esc(s.not_visited.join(', ')) + '. Say which ones matter and they can be looked at.' : '') + '</p>');
+  }
+  h += pSec('Add a firm', '<p class="wv">Know a firm that isn’t here? Add it with its careers page. It goes on the list to be wired into the scan.</p>' +
+    '<div class="wadd"><input type="text" id="pfname" placeholder="Firm name" aria-label="Firm name"><input type="url" id="pflink" placeholder="Careers page link" aria-label="Careers page link">' +
+    '<button class="btn small" data-act="pfirm">Add firm</button></div>' +
+    (firms.length ? '<div class="wgrid">' + firms.map(function(r){
+      return '<div class="wi"><p class="wn">' + pLink(r.data.name, r.data.link) + '</p><p class="wx">Added by ' + esc(whoOf(r.created_by)) + ', ' + esc(day(r.created_at)) +
+        '. Waiting to be wired.</p><button class="mini" data-act="parch" data-rid="' + esc(r.id) + '">Remove</button></div>'; }).join('') + '</div>' : ''));
+  return h;
+}
+
+async function pAdd(tab, data){
+  try {
+    S.saving++; S.saveErr = '';
+    var r = await api.add(tab, S.user.email, data);
+    S.rows.push(r);
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); return false; }
+  finally { S.saving--; }
+  drawPList();
+  return true;
+}
+
+async function pArchive(id, flag){
+  try { await mutate(id, function(){ return {archived: flag}; }); } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection')); return; }
+  drawPList();
+  if (flag) toast('Removed.', function(){ pArchive(id, false); });
+}
+
 /* ---------- small things ---------- */
 
 var toastTimer;
@@ -1663,6 +1936,9 @@ document.addEventListener('click', async function(e){
     jobAction(Number(b.dataset.id), b.dataset.job, card ? card.dataset.status : null); return;
   }
   if (b.dataset.opp){ b.disabled = true; oppAction(Number(b.dataset.id), b.dataset.opp); return; }
+  if (b.dataset.who){ S.jobsWho = b.dataset.who; drawWhos(); drawJobBody(); return; }
+  if (b.dataset.pview){ S.pView = b.dataset.pview; drawPChips(); drawPTools(); drawPList(); return; }
+  if (b.dataset.pset){ b.disabled = true; pSet(b.dataset.pid, b.dataset.pset); return; }
   if (b.dataset.list){
     var lc = b.closest('[data-lid]'); if (!lc) return;
     lc.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
@@ -1689,6 +1965,24 @@ document.addEventListener('click', async function(e){
   if (act === 'signout'){ await api.signOut(); S.user = null; signInView(); return; }
   if (act === 'add'){ addRow(); return; }
   if (act === 'csv'){ downloadCsv(); return; }
+  if (act === 'ptitle'){
+    var ti = $('#ptitle'), tv = ti ? ti.value.trim() : '';
+    if (tv.length < 3){ if (ti) ti.focus(); return; }
+    b.disabled = true;
+    if (await pAdd('paige_titles', {title: tv})) toast('Added. It counts from the next jobscan run.');
+    else b.disabled = false;
+    return;
+  }
+  if (act === 'pfirm'){
+    var fn = $('#pfname'), fl = $('#pflink'), nv = fn ? fn.value.trim() : '', lv = fl ? fl.value.trim() : '';
+    if (!nv){ if (fn) fn.focus(); return; }
+    if (lv && !/^https?:\/\//i.test(lv)) lv = 'https://' + lv;
+    b.disabled = true;
+    if (await pAdd('paige_firms', lv ? {name: nv, link: lv} : {name: nv})) toast('Added to the list to be wired.');
+    else b.disabled = false;
+    return;
+  }
+  if (act === 'parch'){ b.disabled = true; pArchive(b.dataset.rid, true); return; }
   var tr = b.closest('tr[data-id], .sc[data-id]');
   if (tr && act === 'edit'){
     var eid = tr.dataset.id;
@@ -1715,6 +2009,7 @@ document.addEventListener('change', function(e){
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
   if (el.dataset && el.dataset.app){ saveApp(Number(el.dataset.jobId), el.dataset.app, el.value.trim()); return; }
+  if (el.dataset && el.dataset.pk){ pSave(el.dataset.pid, el.dataset.pk, el.value.trim()); return; }
   var k = el.dataset && el.dataset.k, tr = el.closest && el.closest('tr[data-id], .sc[data-id], .detail[data-id]');
   if (!k || !tr) return;
   var c = colOf(TAB[S.tab], k), v;
@@ -1738,13 +2033,29 @@ var jqTimer;
 document.addEventListener('input', function(e){
   if (e.target.tagName === 'TEXTAREA') grow(e.target);
   if (e.target.id === 'jq'){ S.jobQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(loadJobList, 300); }
+  if (e.target.id === 'pq'){ S.pQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(drawPList, 200); }
   if (e.target.id === 'q'){
     S.q = e.target.value;
     clearTimeout(qTimer); qTimer = setTimeout(drawSheet, 150);
   }
 });
 
-window.addEventListener('hashchange', function(){ var h = location.hash.slice(1); if (TAB[h] && h !== S.tab && $('#tabs')) goTab(h); });
+// Enter in the Add title / Add firm boxes adds
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Enter' || !e.target.id) return;
+  var go = {ptitle: 'ptitle', pfname: 'pfirm', pflink: 'pfirm'}[e.target.id];
+  if (!go) return;
+  e.preventDefault();
+  var btn = document.querySelector('button[data-act="' + go + '"]');
+  if (btn && !btn.disabled) btn.click();
+});
+
+window.addEventListener('hashchange', function(){
+  var h = location.hash.slice(1);
+  if (!$('#tabs')) return;
+  if (h === 'paige'){ S.jobsWho = 'paige'; if (S.tab === 'jobs') drawJobs(); else goTab('jobs'); return; }
+  if (TAB[h] && h !== S.tab) goTab(h);
+});
 
 // Coming back to the tab picks up what the other person changed, unless you're mid-edit.
 document.addEventListener('visibilitychange', async function(){
@@ -1756,6 +2067,8 @@ document.addEventListener('visibilitychange', async function(){
     S.rows = await api.rows(); S.loadedAt = Date.now();
     drawMeta(); drawTabs();
     if (TAB[S.tab].map) drawPins(false); else if (!TAB[S.tab].jobs) drawSheet(); else loadJobCounts();
+    // Paige's list lives in the rows just read; redraw it unless she's typing in it
+    if (TAB[S.tab].jobs && S.jobsWho === 'paige' && !(a && a.closest && a.closest('#plist'))){ drawPChips(); drawPList(); drawWhos(); }
   } catch (e){}
 });
 
