@@ -1721,11 +1721,13 @@ async function oppAction(id, status){
 function pRows(st){ return live('paige_jobs').filter(function(r){ return r.data.status === st; }); }
 function pRow(id){ return S.rows.filter(function(r){ return r.id === id; })[0]; }
 function pSummary(){ return live('paige_scan').filter(function(r){ return r.ext_id === 'last-run'; }).map(function(r){ return r.data; })[0] || null; }
-var P_RULES = 'Landscape Architect titles anywhere. Project Manager titles at landscape firms, or where the title, department or employer says landscape or parks. Mid to senior: junior, intern, entry-level and assistant titles are left out. Portland metro on the Oregon side, or remote. Pay of $90,000 or more when the posting lists it. Vancouver is out for now.';
+var P_RULES = 'Landscape Architect titles anywhere. Project Manager titles at landscape firms, or where the title, department or employer says landscape or parks. Mid to senior: junior, intern, entry-level and assistant titles are left out. Portland metro on the Oregon side, or remote. Pay of $80,000 or more when the posting lists it. Vancouver is out for now.';
+// her pay floor, from the scan's summary row (PAY_FLOOR in paige_scan.py), so changing it needs no push
+function pFloor(){ var f = Number((pSummary() || {}).pay_floor) || 80000; return '$' + f.toLocaleString('en-US'); }
 
 function drawPaige(){
   var el = $('#jbody'); if (!el) return;
-  el.innerHTML = '<p class="blurb">Paige’s scan: Landscape Architect and Project Manager jobs, mid to senior level, around Portland, at $90,000 or more when the pay is listed. ' +
+  el.innerHTML = '<p class="blurb">Paige’s scan: Landscape Architect and Project Manager jobs, mid to senior level, around Portland, at ' + pFloor() + ' or more when the pay is listed. ' +
     'Applied moves a job to Applied, where you can mark what happened. Pass moves it to Passed. Reach out lists the firms that take applications directly, and how. Where it looks shows what the scan reads.</p>' +
     '<div class="chips" id="pchips"></div><div id="ptools"></div><div id="plist"></div>';
   drawPChips(); drawPTools(); drawPList();
