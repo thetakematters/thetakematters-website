@@ -1803,9 +1803,20 @@ function pCard(r){
       foot + '<span class="sp"></span><button class="mini" data-pset="queued"' + id + '>Back to the queue</button>');
   }
   if (st === 'passed') return jobShell(j, 'passed', '<span class="jpill">Passed</span>', lines,
-    '<button class="btn small primary" data-pset="applied"' + id + '>Mark applied</button><button class="btn small quiet" data-pset="queued"' + id + '>Back to the queue</button>' + postingBtn(j), foot);
+    '<button class="btn small primary" data-pset="applied"' + id + '>Mark applied</button><button class="btn small quiet" data-pset="queued"' + id + '>Back to the queue</button>' + postingBtn(j) + sendBtn(j, d), foot);
   return jobShell(j, '', '', lines,
-    '<button class="btn small primary" data-pset="applied"' + id + '>Applied</button><button class="btn small quiet" data-pset="passed"' + id + '>Pass</button>' + postingBtn(j), foot);
+    '<button class="btn small primary" data-pset="applied"' + id + '>Applied</button><button class="btn small quiet" data-pset="passed"' + id + '>Pass</button>' + postingBtn(j) + sendBtn(j, d), foot);
+}
+
+// Send to Paige: opens a new email in your own mail app with the job filled in. The To line is
+// left blank so her address stays out of this page (public repo); you add her and press Send.
+// Hidden when Paige is the one signed in.
+function sendBtn(j, d){
+  var u = safeUrl(j.canonical_url);
+  if (!u || whoOf(S.user && S.user.email) === 'Paige') return '';
+  var subj = j.title + (j.employer_name ? ' at ' + j.employer_name : '');
+  var body = [subj, j.location, d.pay ? 'Pay: ' + d.pay : '', '', u].filter(function(x, i){ return x || i === 3; }).join('\r\n');
+  return '<a class="btn small quiet" href="' + esc('mailto:?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body)) + '">Send to Paige</a>';
 }
 
 function pRedraw(){ drawPChips(); drawPList(); drawWhos(); drawMeta(); drawTabs(); }
