@@ -6,34 +6,20 @@
 // Needs supabase-js loaded first.
 window.NeonMove = (function () {
   var DATA = 'https://ep-solitary-art-ar5f2fop.apirest.c-4.us-west-2.aws.neon.tech/neondb';
-  var pass = null, passAt = 0;
-  // Right after a pass is issued, Neon sometimes answers the first requests as if the person weren't on the list (seen
-  // 19 Nov 2026 on the lab and the scripts; on this page, a trip once showed no items). So a new pass is used only once
-  // three checks at once can see its own line on the list (about 10 seconds at most), and an empty answer soon after is
-  // checked again (guarded, below). Copied from the lab's neon-labs.js.
-  var settled = null, settling = null, settledAt = 0;
-  async function probe(t) {
+  // The pass is kept in this browser while it is less than 10 minutes old, so another page or a reload uses the same pass
+  // instead of a new one. Neon answers a brand-new pass unreliably for its first half minute or so (measured 19 Nov 2026:
+  // a pass in use for a while answered 100 requests in 100 right; new ones sent back the odd empty answer), and before this
+  // every page load started with a brand-new pass.
+  var KEEP = 'neon.pass';
+  function kept(uid) {
     try {
-      var r = await fetch(DATA + '/rest/v1/move_editors?select=email', { headers: { authorization: 'Bearer ' + t, accept: 'application/json' } });
-      return r.ok && (await r.json()).length > 0;
-    } catch (e) { return false; }
+      var k = JSON.parse(localStorage.getItem(KEEP) || 'null');
+      return k && k.uid === uid && k.jwt && Date.now() - k.at < 10 * 60 * 1000 ? k : null;
+    } catch (e) { return null; }
   }
-  async function settle(t) {
-    if (settled === t) return t;
-    if (settling && settling.t === t) return settling.p;
-    var p = (async function () {
-      for (var i = 0; i < 8; i++) {
-        var ok = await Promise.all([probe(t), probe(t), probe(t)]);
-        if (ok.every(Boolean)) break;
-        await new Promise(function (ok2) { setTimeout(ok2, 1500); });
-      }
-      settled = t;
-      settledAt = Date.now();
-      return t;
-    })();
-    settling = { t: t, p: p };
-    return p;
-  }
+  function keep(uid) { try { localStorage.setItem(KEEP, JSON.stringify({ uid: uid, jwt: pass, at: passAt })); } catch (e) {} }
+  function forget() { try { localStorage.removeItem(KEEP); } catch (e) {} }
+  var pass = null, passAt = 0;
 
   async function auth(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { accept: 'application/json' } };
@@ -52,16 +38,18 @@ window.NeonMove = (function () {
   async function session() {
     var r = await auth('GET', 'get-session');
     if (r.ok && r.data && r.data.user) {
-      if (r.jwt) { pass = r.jwt; passAt = Date.now(); }
+      var k = kept(r.data.user.id);
+      if (k) { pass = k.jwt; passAt = k.at; }
+      else if (r.jwt) { pass = r.jwt; passAt = Date.now(); keep(r.data.user.id); }
       return r.data.user;
     }
-    pass = null;
+    pass = null; forget();
     return null;
   }
   async function token() {
-    if (pass && Date.now() - passAt < 10 * 60 * 1000) return settle(pass);
+    if (pass && Date.now() - passAt < 10 * 60 * 1000) return pass;
     await session();
-    return pass ? settle(pass) : pass;
+    return pass;
   }
   async function sendCode(email) {
     var r = await auth('POST', 'email-otp/send-verification-otp', { email: email, type: 'sign-in' });
@@ -70,36 +58,35 @@ window.NeonMove = (function () {
   async function signIn(email, code) {
     var r = await auth('POST', 'sign-in/email-otp', { email: email, otp: String(code).replace(/\s+/g, '') });
     if (!r.ok) throw problem(r, 'That code didn’t work. Check it, or ask for a new one.');
-    pass = null;
+    pass = null; forget();
     var user = await session();
     if (!user) throw new Error('Signed in, but the session didn’t stick. Reload the page and try again.');
     return user;
   }
   async function signOut() {
-    pass = null;
+    pass = null; forget();
     await auth('POST', 'sign-out', {});
   }
-  // A read that comes back empty in the first minute and a half after a new pass is asked once more at once, together
-  // with a quick check that the pass can see its own line on the list. If the pass works and the answer is still empty,
-  // the list really is empty and the page goes on without waiting; only when the pass isn't working yet does it wait a
-  // second and a half and try again, up to four times. (19 Nov 2026: the first version waited six seconds on every list
-  // that really is empty, which made the lab slow to load.)
-  function passOf(init) {
-    try {
-      var a = new Headers(init && init.headers).get('authorization') || '';
-      return a.indexOf('Bearer ') === 0 ? a.slice(7) : null;
-    } catch (e) { return null; }
+  // Neon sometimes answers a request as if the person weren't signed in (measured 19 Nov 2026: one to five requests in a
+  // hundred, at any time, not only just after signing in, and a quick check of the list can pass at the same moment): a
+  // read comes back empty, a change is refused or changes nothing. So such an answer is asked again, twice, a fifth of a
+  // second apart, and only then does it stand; in a pass's first 40 seconds, when such answers come in runs, four times,
+  // further apart (0.3, 0.6, 1 and 1.5 seconds). A list that really is empty costs a few quick extra requests; asking a
+  // change again is safe, since it changes the same rows to the same values.
+  async function suspect(r, init) {
+    var method = String((init && init.method) || 'GET').toUpperCase();
+    if (r.status === 401 || r.status === 403) return true;
+    if (method === 'HEAD') return /\/0$/.test(r.headers.get('content-range') || '');
+    if (method === 'GET' && r.status === 406) return true;
+    if (r.status !== 200 || method === 'POST' && !/\/rpc\//.test(String(r.url || ''))) return false;
+    return (await r.clone().text()).trim() === '[]';
   }
-  async function isEmpty(r) { return r.status === 200 && (await r.clone().text()).trim() === '[]'; }
   async function guarded(input, init) {
     var r = await fetch(input, init);
-    var method = (init && init.method) || 'GET';
-    if (method !== 'GET' || !settledAt || Date.now() - settledAt > 90000 || !(await isEmpty(r))) return r;
-    var t = passOf(init);
-    for (var i = 0; i < 4; i++) {
-      var both = await Promise.all([fetch(input, init), t ? probe(t) : Promise.resolve(true)]);
-      if (!(await isEmpty(both[0])) || both[1]) return both[0];
-      await new Promise(function (ok) { setTimeout(ok, 1500); });
+    var waits = passAt && Date.now() - passAt < 40000 ? [300, 600, 1000, 1500] : [200, 200];
+    for (var i = 0; i < waits.length && (await suspect(r, init)); i++) {
+      await new Promise(function (ok) { setTimeout(ok, waits[i]); });
+      r = await fetch(input, init);
     }
     return r;
   }
