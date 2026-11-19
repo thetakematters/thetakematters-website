@@ -1,0 +1,6 @@
+{
+  "name": "thetakematters-website",
+  "private": true,
+  "type": "module",
+  "description": "The site is plain files; this is only for api/auth.js, the sign-in doorway for /move and /jobs."
+}

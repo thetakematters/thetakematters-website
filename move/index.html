@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
 <!--
-  Portland move board (6 Oct 2026). Private: Supabase Auth sign-in, and row level
+  Portland move board (6 Oct 2026). Private: since 19 Nov 2026 it runs on the Neon database
+  "portland-move" (neon-move.js: emailed-code sign-in through /api/auth), and row level
   security lets only addresses on move_editors read or change anything. Tabs are
   rows in move_rows (one table, data jsonb holds the cells), so a new column needs
   no database change. The page never deletes: it archives, and every edit first
@@ -351,13 +352,12 @@ table.sheet{border-collapse:collapse;width:100%}
 <div id="root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/neon-move.js"></script>
 <script>
-var SB_URL = 'https://ybfaykwwnirjwabmgsqu.supabase.co';
-var SB_KEY = 'sb_publishable__doHKn0KYVVPUnYqVdchnw_TBUq5eYy';
 // ?demo runs on made-up rows in memory, on localhost only, so the live site never shows them
 var DEMO = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]demo\b/.test(location.search);
-// default storage key on purpose: one sign-in covers this page and /jobs
-var sb = !DEMO && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+// the Neon database's client (neon-move.js); one sign-in covers this page and /jobs
+var sb = !DEMO && window.NeonMove ? NeonMove.client() : null;
 
 var AREAS = ['West Linn', 'Sherwood', 'Mount Tabor area', 'Grant High area', 'Sellwood-Moreland', 'SW Washington', 'Other'];
 // Jeffrey's Zillow saved searches, one per school (a rent search and a buy search for each).
@@ -520,9 +520,10 @@ function must(r){ if (r.error) throw r.error; return r.data; }
 
 var JOB_COLS = 'id,employer_name,title,location,salary_min,salary_max,salary_raw,status,canonical_url,first_seen,updated_at';
 var api = DEMO ? demoApi() : {
-  session: async function(){ var r = await sb.auth.getSession(); return r.data && r.data.session ? r.data.session.user : null; },
-  signIn: async function(email, pass){ var r = await sb.auth.signInWithPassword({email: email, password: pass}); if (r.error) throw r.error; return r.data.user; },
-  signOut: function(){ return sb.auth.signOut(); },
+  session: function(){ return NeonMove.session(); },
+  sendCode: function(email){ return NeonMove.sendCode(email); },
+  signIn: function(email, code){ return NeonMove.signIn(email, code); },
+  signOut: function(){ return NeonMove.signOut(); },
   isEditor: async function(){ return must(await sb.from('move_editors').select('email')).length > 0; },
   rows: async function(){ return must(await sb.from('move_rows').select('*').order('created_at', {ascending: true}).limit(5000)); },
   row: async function(id){ return must(await sb.from('move_rows').select('*').eq('id', id).single()); },
@@ -631,6 +632,7 @@ function demoApi(){
   function find(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
   return {
     session: async function(){ return {email: me}; },
+    sendCode: async function(){},
     signIn: async function(){ return {email: me}; },
     signOut: async function(){},
     isEditor: async function(){ return true; },
@@ -661,17 +663,33 @@ function demoApi(){
 
 function gate(html){ $('#root').innerHTML = '<div class="gate"><div class="gate-card">' + html + '</div></div>'; }
 
-function signInView(msg){
-  gate('<p class="eyebrow">Private</p><h1>Portland move</h1><p>Sign in to see the board.</p>' +
+// sign in with an emailed 6-digit code (19 Nov 2026): first the email, then the code
+function signInView(msg, email){
+  gate('<p class="eyebrow">Private</p><h1>Portland move</h1><p>Sign in to see the board. We’ll email you a 6-digit code.</p>' +
     (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
     '<form id="signin"><label class="fld"><span>Email</span><input type="email" id="email" autocomplete="username" required></label>' +
-    '<label class="fld"><span>Password</span><input type="password" id="pass" autocomplete="current-password" required></label>' +
-    '<button class="btn primary" type="submit">Sign in</button></form>');
+    '<button class="btn primary" type="submit">Email me a code</button></form>');
+  if (email) $('#email').value = email;
   $('#signin').onsubmit = async function(e){
     e.preventDefault();
-    var b = this.querySelector('button'); b.disabled = true;
-    try { S.user = await api.signIn($('#email').value.trim(), $('#pass').value); boot(); }
-    catch (err){ signInView(err.message || 'Sign-in failed.'); }
+    var b = this.querySelector('button'), addr = $('#email').value.trim().toLowerCase();
+    b.disabled = true;
+    try { await api.sendCode(addr); codeView(addr); }
+    catch (err){ signInView(err.message || 'The code could not be sent.', addr); }
+  };
+}
+function codeView(email, msg){
+  gate('<p class="eyebrow">Private</p><h1>Portland move</h1><p>If ' + esc(email) + ' is on the board’s list, a 6-digit code is on its way. It can take a minute.</p>' +
+    (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
+    '<form id="codeform"><label class="fld"><span>Code</span><input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" required></label>' +
+    '<button class="btn primary" type="submit">Sign in</button> <button class="btn quiet" type="button" id="otheraddr">Use another email</button></form>');
+  $('#code').focus();
+  $('#otheraddr').onclick = function(){ signInView('', email); };
+  $('#codeform').onsubmit = async function(e){
+    e.preventDefault();
+    var b = this.querySelector('button[type=submit]'); b.disabled = true;
+    try { S.user = await api.signIn(email, $('#code').value); boot(); }
+    catch (err){ codeView(email, err.message || 'That code didn’t work.'); }
   };
 }
 
@@ -682,14 +700,14 @@ async function boot(){
   try {
     if (!(await api.isEditor())){
       gate('<p class="eyebrow">Portland move</p><h1>Not on the list</h1><p>You’re signed in as ' + esc(S.user.email) +
-        ', but this address isn’t on the board’s list yet. Jeffrey adds it in Supabase.</p><button class="btn quiet" data-act="signout">Sign out</button>');
+        ', but this address isn’t on the board’s list yet. Jeffrey adds it to the list in the database.</p><button class="btn quiet" data-act="signout">Sign out</button>');
       return;
     }
     S.rows = await api.rows();
     S.loadedAt = Date.now();
   } catch (e){
     if (e && (e.code === 'PGRST205' || e.code === '42P01')){
-      gate('<p class="eyebrow">Almost there</p><h1>Portland move</h1><p>You’re signed in, but the board’s tables aren’t in the database yet. Run the setup SQL in Supabase, then reload this page.</p><button class="btn quiet" data-act="signout">Sign out</button>');
+      gate('<p class="eyebrow">Almost there</p><h1>Portland move</h1><p>You’re signed in, but the board’s tables aren’t in the database yet. Run the setup SQL in the database, then reload this page.</p><button class="btn quiet" data-act="signout">Sign out</button>');
       return;
     }
     gate('<p class="eyebrow">Portland move</p><h1>Something went wrong</h1><div class="err">' + esc(e.message || e) + '</div><button class="btn quiet" data-act="signout">Sign out</button>');

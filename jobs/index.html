@@ -57,8 +57,9 @@ footer{max-width:880px;margin:0 auto;padding:8px 20px 40px;font-size:12px;color:
     <div class="sub">Private dashboard</div>
     <div id="loginErr" class="err">Sign-in failed</div>
     <input type="email" id="email" placeholder="Email" autocomplete="username" value="jeffrey@musicalform.org">
-    <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
-    <button id="loginBtn" class="btn btn-primary" style="width:100%">Sign in</button>
+    <div id="codeNote" class="sub" style="display:none"></div>
+    <input type="text" id="code" placeholder="6-digit code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" style="display:none">
+    <button id="loginBtn" class="btn btn-primary" style="width:100%">Email me a code</button>
   </div>
 </div>
 
@@ -74,10 +75,10 @@ footer{max-width:880px;margin:0 auto;padding:8px 20px 40px;font-size:12px;color:
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/neon-move.js"></script>
 <script>
-var SB_URL = 'https://ybfaykwwnirjwabmgsqu.supabase.co';
-var SB_KEY = 'sb_publishable__doHKn0KYVVPUnYqVdchnw_TBUq5eYy';
-var sb = window.supabase.createClient(SB_URL, SB_KEY);
+// the Neon database "portland-move" (19 Nov 2026); sign-in is an emailed code, shared with /move
+var sb = NeonMove.client();
 var $ = function(id){ return document.getElementById(id); };
 
 var TABS = [
@@ -253,18 +254,35 @@ function show(loggedIn){
   if (loggedIn){ drawTabs(); load(); }
 }
 
+// sign in with an emailed 6-digit code: first the email, then the code
+var codeFor = null;
+function loginErr(m){ $('loginErr').textContent = m; $('loginErr').style.display = m ? 'block' : 'none'; }
 $('loginBtn').onclick = function(){
-  sb.auth.signInWithPassword({email: $('email').value.trim(), password: $('pass').value})
-    .then(function(r){
-      if (r.error){ $('loginErr').textContent = r.error.message; $('loginErr').style.display = 'block'; }
-      else show(true);
-    });
+  var b = $('loginBtn'); b.disabled = true; loginErr('');
+  if (!codeFor){
+    var email = $('email').value.trim().toLowerCase();
+    NeonMove.sendCode(email).then(function(){
+      codeFor = email;
+      $('codeNote').textContent = 'If ' + email + ' is on the list, a 6-digit code is on its way. It can take a minute.';
+      $('codeNote').style.display = 'block'; $('code').style.display = 'block'; $('code').focus();
+      b.textContent = 'Sign in';
+    }, function(e){ loginErr(e.message || 'The code could not be sent.'); }).then(function(){ b.disabled = false; });
+    return;
+  }
+  NeonMove.signIn(codeFor, $('code').value).then(function(){ show(true); },
+    function(e){ loginErr(e.message || 'That code didn’t work.'); }).then(function(){ b.disabled = false; });
 };
-$('pass').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('loginBtn').click(); });
-$('outBtn').onclick = function(){ sb.auth.signOut().then(function(){ show(false); }); };
+$('code').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('loginBtn').click(); });
+$('email').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('loginBtn').click(); });
+$('outBtn').onclick = function(){
+  NeonMove.signOut().then(function(){
+    codeFor = null; $('code').value = ''; $('code').style.display = 'none'; $('codeNote').style.display = 'none';
+    $('loginBtn').textContent = 'Email me a code'; show(false);
+  });
+};
 $('refreshBtn').onclick = load;
 
-sb.auth.getSession().then(function(r){ show(!!(r.data && r.data.session)); });
+NeonMove.session().then(function(u){ show(!!u); }, function(){ show(false); });
 </script>
 </body>
 </html>
