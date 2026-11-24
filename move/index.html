@@ -487,6 +487,7 @@ TABS.forEach(function(t){ TAB[t.key] = t; });
 var S = {user: null, tab: 'timeline', rows: [], fresh: {}, open: {}, editing: {}, sort: {}, q: '', area: '', search: '', mapKind: 'all', mapSchools: true,
          hideDone: false, showArch: false, jobsView: 'queued', jobCounts: null, jobQ: '',
          jobsWho: '', pView: 'queued', pQ: '',
+         places: null, plShow: 'watch', plArea: '', plKind: '', plQ: '', plMax: 40,
          loadedAt: 0, saving: 0, saveErr: ''};
 
 // Homes loaded from the listing alerts. One still marked New waits in the tab's New list.
@@ -525,7 +526,17 @@ var api = DEMO ? demoApi() : {
   signIn: function(email, code){ return NeonMove.signIn(email, code); },
   signOut: function(){ return NeonMove.signOut(); },
   isEditor: async function(){ return must(await sb.from('move_editors').select('email')).length > 0; },
-  rows: async function(){ return must(await sb.from('move_rows').select('*').order('created_at', {ascending: true}).limit(5000)); },
+  // the companies (tab job_places, about 1,190 rows) are left out here: they load when the Companies list is opened
+  rows: async function(){ return must(await sb.from('move_rows').select('*').neq('tab', 'job_places').order('created_at', {ascending: true}).limit(5000)); },
+  places: async function(){
+    var out = [], step = 500, got;
+    do {
+      got = must(await sb.from('move_rows').select('id,data,updated_by,updated_at').eq('tab', 'job_places').eq('archived', false)
+        .order('ext_id', {ascending: true}).range(out.length, out.length + step - 1));
+      out = out.concat(got);
+    } while (got.length === step);
+    return out;
+  },
   row: async function(id){ return must(await sb.from('move_rows').select('*').eq('id', id).single()); },
   add: async function(tab, me, data){ return must(await sb.from('move_rows').insert({tab: tab, data: data || {}, created_by: me, updated_by: me}).select().single()); },
   version: async function(row, me){ must(await sb.from('move_versions').insert({row_id: row.id, data: row.data, archived: row.archived, saved_by: me})); },
@@ -622,6 +633,15 @@ function demoApi(){
     r.source = 'paige_scan'; r.ext_id = 'last-run'; return r;
   })());
   rows.push(mk('paige_titles', {title: 'Example Park Planner'}, 2));
+  function pl(data, h){ var r = mk('job_places', Object.assign({kind: 'Music or arts nonprofit', state: 'OR', area: 'Portland, Salem and SW Washington', fit: 'Close', status: 'watch', checked_on: '2026-11-24'}, data), h); r.source = 'company_list'; r.ext_id = 'demo-place-' + n; return r; }
+  rows.push(
+    pl({name: 'Example Community Radio', kind: 'Media or radio', city: 'Portland', county: 'Multnomah', does: 'Example public radio station.', jobs: ['Music curation and programming'], why: 'Example: music analysis work.', website: 'https://example.com/radio', careers: 'https://example.com/radio/jobs', alerts: 'https://example.com/radio/alerts', linkedin: 'https://example.com/li', size: '11 to 50',
+      openings: [{job_title: 'Example Music Librarian', job_link: 'https://example.com/radio/jobs/1', pay: '$70,000', work_type: 'Full-time', closes_on: '2026-12-18'}]}, 4),
+    pl({name: 'Example Arts Funder', kind: 'Arts funder', city: 'Seattle', county: 'King', state: 'WA', area: 'Seattle and King County', does: 'Example foundation that funds artists.', jobs: ['Funding programs', 'Program management'], website: 'https://example.com/funder', careers: 'https://example.com/funder/jobs', part_time: true,
+      notes: 'Example note long enough to fold on the card: the careers page could not be read in full, so a zero here does not mean no openings, and paid staffing is not confirmed. Nothing here is real.'}, 4),
+    pl({name: 'Example Jazz Society', city: 'Salem', county: 'Marion', status: 'list', does: 'Example jazz society.', jobs: ['Program management'], website: 'javascript:alert(1)'}, 4),
+    pl({name: 'Example Tiny Label', kind: 'Music company', city: 'Portland', status: 'list', fit: 'Partial', does: 'Example label.', jobs: ['Music catalog, metadata and rights']}, 4),
+    pl({name: 'Example Big Museum', kind: 'Museum or cultural center', city: 'Tacoma', county: 'Pierce', state: 'WA', area: 'Rest of western Washington', status: 'no', does: 'Example museum.', jobs: ['Education and public programs'], careers: 'https://example.com/museum', scanned: 'Example board'}, 4));
   var opps = [{id: 1, kind: 'grant', title: 'Example arts grant', org: 'Example funder', location: 'Oregon', url: 'https://example.com/grant', deadline: '2026-12-01', status: 'new', amount_raw: '$10,000 - $50,000',
     description: 'Demo opportunity. Example text long enough to fold: it funds projects that bring people together around the arts, with a match required and a letter of intent due first. Nothing here is real.'},
     {id: 2, kind: 'grant', title: 'Example project grant (2027)', org: 'Example county arts group', location: 'Portland area', url: 'https://example.com/grant-2', deadline: null, status: 'new',
@@ -636,7 +656,8 @@ function demoApi(){
     signIn: async function(){ return {email: me}; },
     signOut: async function(){},
     isEditor: async function(){ return true; },
-    rows: async function(){ return copy(rows); },
+    rows: async function(){ return copy(rows.filter(function(r){ return r.tab !== 'job_places'; })); },
+    places: async function(){ return copy(rows.filter(function(r){ return r.tab === 'job_places' && !r.archived; })); },
     row: async function(id){ return copy(find(id)); },
     add: async function(tab, who, data){ var r = mk(tab, data || {}, 0); r.created_at = r.updated_at = new Date().toISOString(); rows.push(r); return copy(r); },
     version: async function(){},
@@ -1554,7 +1575,7 @@ function drawWhos(){
 function drawJobBody(){
   var el = $('#jbody'); if (!el) return;
   if (S.jobsWho === 'paige'){ drawPaige(); return; }
-  el.innerHTML = '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads from grantscan.</p>' +
+  el.innerHTML = '<p class="blurb">The job scan’s queue. Applied moves a job to Applied, where you can mark what happened; Pass moves it to Passed. Opportunities are grants and other leads from grantscan. Companies are the places to watch for jobs in the Portland area and Washington.</p>' +
     '<div class="chips" id="jchips"></div><div id="jtools"></div><div id="jlist"><p class="blurb">Loading…</p></div>';
   drawJobChips(); drawJobTools(); loadJobList();
 }
@@ -1562,7 +1583,8 @@ function drawJobBody(){
 function drawJobChips(){
   var el = $('#jchips'); if (!el) return;
   var c = S.jobCounts || {};
-  el.innerHTML = [['queued', 'Queued', c.queued], ['applied', 'Applied', c.applied], ['passed', 'Passed', c.passed], ['opps', 'Opportunities', c.opps]].map(function(x){
+  el.innerHTML = [['queued', 'Queued', c.queued], ['applied', 'Applied', c.applied], ['passed', 'Passed', c.passed], ['opps', 'Opportunities', c.opps],
+   ['places', 'Companies', S.places ? plCount('watch') : null]].map(function(x){
     return '<button class="chip' + (S.jobsView === x[0] ? ' on' : '') + '" data-jview="' + x[0] + '">' + x[1] +
       (x[2] != null ? '<span class="c">' + x[2] + '</span>' : '') + '</button>';
   }).join('');
@@ -1571,12 +1593,14 @@ function drawJobChips(){
 // the search box only shows on Passed; it's drawn once so typing keeps the cursor
 function drawJobTools(){
   var el = $('#jtools'); if (!el) return;
+  if (S.jobsView === 'places'){ drawPlTools(el); return; }
   if (S.jobsView !== 'passed'){ el.innerHTML = ''; return; }
   if (!$('#jq', el)) el.innerHTML = '<div class="tools"><input type="search" id="jq" placeholder="Find a job you passed: title or employer" aria-label="Find a passed job" value="' + esc(S.jobQ) + '"></div>';
 }
 
 async function loadJobList(){
   var view = S.jobsView, el = $('#jlist');
+  if (view === 'places'){ loadPlaces(); return; }
   try {
     var list;
     if (view === 'opps') list = await api.opps();
@@ -1598,6 +1622,110 @@ async function loadJobList(){
   } catch (e){
     if ($('#jlist')) $('#jlist').innerHTML = '<div class="err">Could not load the jobs: ' + esc(e.message || e) + '</div>';
   }
+}
+
+/* ---------- companies: the places to watch for jobs (24 Nov 2026) ---------- */
+
+// One row per place in move_rows (tab job_places), from the eight ChatGPT runs. data.status: watch, list or no.
+// The page only changes status; every change keeps the earlier row, like every other edit here.
+var PL_SHOW = [['watch', 'Watching'], ['open', 'Openings found'], ['close', 'Close fit, no careers page'], ['list', 'The rest'], ['no', 'Not for me'], ['all', 'All']];
+var PL_STAT = {watch: 'Watching', list: 'Not watched', no: 'Not for me'};
+function plIn(d, show){
+  if (show === 'all') return true;
+  if (show === 'open') return d.status !== 'no' && (d.openings || []).length > 0;
+  if (show === 'close') return d.status === 'list' && d.fit === 'Close';
+  if (show === 'list') return d.status === 'list' && d.fit !== 'Close';
+  return d.status === show;
+}
+function plCount(show){ return (S.places || []).filter(function(r){ return plIn(r.data, show); }).length; }
+function plValues(k){
+  var n = {}; (S.places || []).forEach(function(r){ var v = r.data[k]; if (v) n[v] = (n[v] || 0) + 1; });
+  return Object.keys(n).sort();
+}
+
+function drawPlTools(el){
+  if (!S.places){ el.innerHTML = ''; return; }
+  function opts(list, cur, all){
+    return (all ? '<option value="">' + all + '</option>' : '') + list.map(function(x){
+      var v = x[0], l = x[1]; return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('');
+  }
+  function same(list){ return list.map(function(v){ return [v, v]; }); }
+  el.innerHTML = '<div class="tools"><select id="plShow" aria-label="Which companies">' +
+      opts(PL_SHOW.map(function(x){ return [x[0], x[1] + ' (' + plCount(x[0]) + ')']; }), S.plShow) + '</select>' +
+    '<select id="plArea" aria-label="Area">' + opts(same(plValues('area')), S.plArea, 'Every area') + '</select>' +
+    '<select id="plKind" aria-label="Kind of place">' + opts(same(plValues('kind')), S.plKind, 'Every kind') + '</select>' +
+    '<input type="search" id="plQ" placeholder="Name, town or kind of job" aria-label="Find a company" value="' + esc(S.plQ) + '"></div>';
+}
+
+async function loadPlaces(){
+  if (!S.places){
+    try {
+      var got = await api.places();
+      got.sort(function(a, b){ return String(a.data.name).localeCompare(String(b.data.name)); });
+      S.places = got;
+    } catch (e){
+      if ($('#jlist')) $('#jlist').innerHTML = '<div class="err">Could not load the companies: ' + esc((e && e.message) || e) + '</div>';
+      return;
+    }
+    if (S.tab !== 'jobs' || S.jobsView !== 'places' || !$('#jlist')) return;
+    drawJobChips(); drawJobTools();
+  }
+  drawPlaces();
+}
+
+function plVisible(){
+  var q = S.plQ.trim().toLowerCase();
+  return (S.places || []).filter(function(r){
+    var d = r.data;
+    return plIn(d, S.plShow) && (!S.plArea || d.area === S.plArea) && (!S.plKind || d.kind === S.plKind) &&
+      (!q || [d.name, d.city, d.county, d.does, (d.jobs || []).join(' ')].join(' ').toLowerCase().indexOf(q) >= 0);
+  });
+}
+
+function drawPlaces(){
+  var el = $('#jlist'); if (!el) return;
+  if (!(S.places || []).length){ el.innerHTML = '<div class="empty">The companies aren’t loaded yet.</div>'; return; }
+  var list = plVisible();
+  if (!list.length){ el.innerHTML = '<div class="empty">No company matches that.</div>'; return; }
+  el.innerHTML = '<p class="appsum">' + list.length + (list.length === 1 ? ' company' : ' companies') + (list.length > S.plMax ? ', first ' + S.plMax + ' shown' : '') + '.</p>' +
+    '<div class="scards">' + list.slice(0, S.plMax).map(placeCard).join('') + '</div>' +
+    (list.length > S.plMax ? '<button class="addrow" data-plmore>Show ' + Math.min(40, list.length - S.plMax) + ' more</button>' : '');
+  trimFolds(el);
+}
+
+function placeCard(r){
+  var d = r.data, id = ' data-id="' + esc(r.id) + '"', u = safeUrl(d.website), c = safeUrl(d.careers), a = safeUrl(d.alerts), li = safeUrl(d.linkedin);
+  var open = (d.openings || []).map(function(o){
+    var ou = safeUrl(o.job_link), t = esc(o.job_title);
+    return (ou ? '<a href="' + esc(ou) + '" target="_blank" rel="noopener noreferrer">' + t + '</a>' : t) +
+      [o.pay, o.work_type === 'Not stated' ? '' : o.work_type, o.closes_on ? 'closes ' + day(o.closes_on) : ''].filter(Boolean).map(function(x){ return ' · ' + esc(x); }).join('');
+  }).join('<br>');
+  var how = d.scanned ? 'Already in the job scan' : c ? '' : 'No careers page found';
+  var lines = (d.does ? jline('What', esc(d.does)) : '') + ((d.jobs || []).length ? jline('Jobs', esc(d.jobs.join(', '))) : '') +
+    (d.why ? jline('Fits', esc(d.why)) : '') + (open ? jline('Open', open) : '') +
+    (d.part_time ? jline('Part-time', 'Has posted part-time jobs of these kinds') : '') + (d.size ? jline('Staff', esc(d.size)) : '') + (how ? jline('Jobs page', esc(how)) : '');
+  var note = d.notes ? '<div class="ssec' + (d.notes.length > 150 ? ' fold' : '') + '"><p class="k">ChatGPT’s note</p><p class="v">' + esc(d.notes) + '</p></div>' +
+    (d.notes.length > 150 ? '<button class="mini mlink" data-unfold>Show all</button>' : '') : '';
+  function link(x, label, cls){ return x ? '<a class="btn small ' + cls + '" href="' + esc(x) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>' : ''; }
+  return '<article class="sc jc place" data-card="' + esc(r.id) + '"><div class="sch"><h3>' +
+    (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(d.name) + '</a>' : esc(d.name)) + '</h3><span class="jpill">' + esc(PL_STAT[d.status] || '') + '</span></div>' +
+    '<p class="ssub">' + [d.kind, [d.city, d.state].filter(Boolean).join(', '), d.fit === 'Close' ? 'Close fit' : ''].filter(Boolean).map(esc).join(' · ') + '</p>' +
+    '<div class="scon">' + lines + '</div>' + note +
+    '<div class="slinks">' + link(c, 'Careers page', 'primary') + link(a, 'Job alerts', 'quiet') + link(li, 'LinkedIn', 'quiet') + '</div>' +
+    '<div class="sfoot"><span class="edited">Read ' + esc(day(d.checked_on)) + '</span><span class="sp"></span>' +
+    (d.status === 'watch' ? '<button class="mini" data-place="list"' + id + '>Stop watching</button>' : '<button class="mini" data-place="watch"' + id + '>Watch</button>') +
+    (d.status === 'no' ? '' : '<button class="mini" data-place="no"' + id + '>Not for me</button>') + '</div></article>';
+}
+
+async function placeSet(id, status, undoable){
+  var r = (S.places || []).filter(function(x){ return x.id === id; })[0]; if (!r) return;
+  var prev = r.data.status;
+  try {
+    var row = await mutate(id, function(cur){ return {data: Object.assign({}, cur.data, {status: status})}; });
+    r.data = row.data;
+  } catch (e){ toast('Could not save: ' + ((e && e.message) || 'check the connection and try again')); drawPlaces(); return; }
+  drawJobChips(); drawJobTools(); drawPlaces();
+  if (undoable !== false) toast({watch: 'Watching.', list: 'Stopped watching.', no: 'Not for me.'}[status] || 'Saved.', function(){ placeSet(id, prev, false); });
 }
 
 /* ---------- jobs you applied to ---------- */
@@ -1974,6 +2102,8 @@ document.addEventListener('click', async function(e){
     jobAction(Number(b.dataset.id), b.dataset.job, card ? card.dataset.status : null); return;
   }
   if (b.dataset.opp){ b.disabled = true; oppAction(Number(b.dataset.id), b.dataset.opp); return; }
+  if (b.dataset.place){ b.disabled = true; placeSet(b.dataset.id, b.dataset.place); return; }
+  if (b.hasAttribute('data-plmore')){ S.plMax += 40; drawPlaces(); return; }
   if (b.dataset.who){ S.jobsWho = b.dataset.who; drawWhos(); drawJobBody(); return; }
   if (b.dataset.pview){ S.pView = b.dataset.pview; drawPChips(); drawPTools(); drawPList(); return; }
   if (b.dataset.pset){ b.disabled = true; pSet(b.dataset.pid, b.dataset.pset); return; }
@@ -2044,6 +2174,7 @@ document.addEventListener('change', function(e){
   if (el.id === 'area'){ S.area = el.value; drawSheet(); return; }
   if (el.id === 'srch'){ S.search = el.value; if (TAB[S.tab].map) drawPins(true); else drawSheet(); return; }
   if (el.id === 'mapSchools'){ S.mapSchools = el.checked; drawPins(false); return; }
+  if (el.id === 'plShow' || el.id === 'plArea' || el.id === 'plKind'){ S[el.id] = el.value; S.plMax = 40; drawPlaces(); return; }
   if (el.id === 'hideDone'){ S.hideDone = el.checked; drawSheet(); return; }
   if (el.id === 'showArch'){ S.showArch = el.checked; drawSheet(); return; }
   if (el.dataset && el.dataset.app){ saveApp(Number(el.dataset.jobId), el.dataset.app, el.value.trim()); return; }
@@ -2071,6 +2202,7 @@ var jqTimer;
 document.addEventListener('input', function(e){
   if (e.target.tagName === 'TEXTAREA') grow(e.target);
   if (e.target.id === 'jq'){ S.jobQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(loadJobList, 300); }
+  if (e.target.id === 'plQ'){ S.plQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(function(){ S.plMax = 40; drawPlaces(); }, 200); }
   if (e.target.id === 'pq'){ S.pQ = e.target.value; clearTimeout(jqTimer); jqTimer = setTimeout(drawPList, 200); }
   if (e.target.id === 'q'){
     S.q = e.target.value;
